@@ -1,0 +1,117 @@
+[project]
+authors = [
+  {name = "Nikitosio Noskovinni", email = "nik.noskov08@gmail.com"},
+]
+
+dependencies = [
+  "jinja2>=3.1.6",
+  "pydantic>=2.12.5",
+  "python-multipart>=0.0.20",
+  "starlette>=0.50.0",
+  "uvicorn>=0.38.0",
+]
+description = "Add your description here"
+license = {text = "MIT"}
+name = "phoenix-admin"
+readme = "README.md"
+requires-python = ">=3.11"
+version = "0.0.1"
+
+[project.urls]
+"GitHub" = "https://github.com/barbarrista/phoenix-admin"
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.hatch.build.targets.sdist]
+ignore-vcs = true
+include = ["phoenix_admin/*", "tests/*", "docs/*"]
+
+[tool.hatch.build.targets.wheel]
+include = ["phoenix_admin/*"]
+
+[dependency-groups]
+lint = [
+  "deptry>=0.24.0",
+  "mypy>=1.19.0",
+  "ruff>=0.14.6",
+]
+
+[tool.ruff]
+exclude = []
+lint.fixable = [
+  "F",
+  "E",
+  "W",
+  "I",
+  "COM",
+  "UP",
+  "RUF",
+]
+lint.ignore = [
+  "PLR2044",
+  "E501", # Line Length
+  "A003", # Class attribute ... is shadowing a python builtin
+  "D", # pydocstyle
+  "PD", # pandas-vet
+  "INP",
+  "TC001",
+  "TC002",
+  "TC003",
+  "EXE",
+  "RUF001",
+  "RUF002",
+  "RUF003",
+  "COM812",
+  "ISC001",
+]
+lint.select = ["ALL"]
+src = ["phoenix_admin", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+  "S101",
+  "S311",
+  "PLR0913",
+  "ARG005",
+]
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+
+[tool.ruff.lint.mccabe]
+max-complexity = 7
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = []
+
+[tool.ruff.lint.pep8-naming]
+classmethod-decorators = [
+  "classmethod",
+]
+staticmethod-decorators = ["staticmethod"]
+
+[tool.mypy]
+exclude = ""
+plugins = []
+
+follow_imports = "normal"
+ignore_missing_imports = true
+
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+explicit_package_bases = true
+no_implicit_optional = true
+
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_ignores = true
+
+strict = true
+strict_equality = true
+strict_optional = true

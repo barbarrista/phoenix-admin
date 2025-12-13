@@ -1,0 +1,10 @@
+<label class="form-label">{{ field.name }}</label>
+<textarea id="{{ field.name }}" 
+data-bs-toggle="autosize"
+name="{{ field.name }}"
+{% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
+{% if field.required %}required{% endif %}
+{% if field.rows %}rows="{{ field.rows }}"{% endif %}
+{% if field.cols %}cols="{{ field.cols }}"{% endif %}>
+{{- field.value or '' -}}
+</textarea>

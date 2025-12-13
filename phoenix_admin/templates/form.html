@@ -1,0 +1,27 @@
+{% extends "base.html" %} {% block content %}
+
+<div class="page-wrapper w-100 d-flex">
+    <div class="mx-auto w-50">
+        <div class="text-center">
+            <h1 class="mb-3">{{ view.config.title }}</h1>
+        </div>
+        {% if not result %}
+        <form method="POST" enctype="multipart/form-data">
+            <div class="card p-3">
+                {% for field in form_fields %}
+                <div class="mb-3">
+                    {% include field.form_template %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="mt-2 btn btn-primary">
+                    {{ view.config.submit_button_text or 'Send' }}
+                </button>
+            </div>
+        {% endif %}
+        {% if result %}
+            {% include "datagrid/grid.html" %}
+        {% endif %}
+        </form>
+    </div>
+</div>
+{% endblock %}

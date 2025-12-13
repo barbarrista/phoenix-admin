@@ -1,0 +1,12 @@
+{% macro macro(view) -%}
+<li class="nav-item">
+  <a class="nav-link" href="{{ url_for(view.config.name) }}">
+    <span class="nav-link-icon d-md-none d-lg-inline-block">
+      {% if view.config.icon %}
+      <i class="{{ view.config.icon }}"></i>
+      {% endif %}
+    </span>
+    <span class="nav-link-title"> {{ view.config.title }} </span>
+  </a>
+</li>
+{% endmacro %}

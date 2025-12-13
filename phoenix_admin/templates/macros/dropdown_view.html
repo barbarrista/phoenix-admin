@@ -1,0 +1,28 @@
+{% macro macro(view) -%}
+<li class="nav-item dropdown">
+  <a
+    class="nav-link dropdown-toggle"
+    href="#navbar-base"
+    data-bs-toggle="dropdown"
+    role="button"
+    aria-expanded="false"
+    data-bs-auto-close="inside"
+  >
+  {% if view.icon %}
+  <span class="nav-link-icon d-md-none d-lg-inline-block">
+    <i class="{{ view.icon }}"></i>
+  </span>
+  {% endif %}
+    <span class="nav-link-title"> {{ view.title }} </span>
+  </a>
+  <div class="dropdown-menu">
+    {% for item in view.views %}
+        {% if item | is_dropdown %}
+          
+        {% else %}
+        <a class="dropdown-item" href="{{ url_for(item.config.name) }}"> {{ item.config.title }} </a>
+        {% endif %}
+    {% endfor %}
+  </div>
+</li>
+{% endmacro %}

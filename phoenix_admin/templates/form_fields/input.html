@@ -1,0 +1,11 @@
+<label class="form-label">{{ field.name }}</label>
+<input
+  type="text"
+  class="form-control"
+  id="{{ field.name }}" 
+  name="{{ field.name }}" 
+  value="{{ field.value or '' }}"
+  {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
+  {% if field.required %}required{% endif %}
+  {% if field.readonly %}readonly{% endif %}
+/>

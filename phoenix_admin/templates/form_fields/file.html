@@ -1,0 +1,7 @@
+<label class="form-label">{{ field.name }}</label>
+<input type="file" 
+id="{{ field.name }}" 
+name="{{ field.name }}"
+{% if field.accept %}accept="{{ field.accept }}"{% endif %}
+{% if field.multiple %}multiple{% endif %}
+{% if field.required %}required{% endif %}/>
