@@ -62,3 +62,7 @@
 ### Plugins
 
 - [ ] Support Plugin architecture
+
+### Localization
+
+- [ ] Support i18n
