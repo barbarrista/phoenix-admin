@@ -7,7 +7,7 @@ from starlette.responses import Response
 from starlette.templating import Jinja2Templates
 from typing_extensions import Doc
 
-from config import ViewConfig
+from phoenix_admin.config import ViewConfig
 from phoenix_admin.utils import getval
 
 

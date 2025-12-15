@@ -8,7 +8,7 @@ from starlette.responses import Response
 from starlette.templating import Jinja2Templates
 from starlette.types import ASGIApp
 
-from config import ViewConfig
+from phoenix_admin.config import ViewConfig
 from phoenix_admin.exceptions import PhoenixAdminError
 from phoenix_admin.jinja_helpers import raise_exception
 from phoenix_admin.views.base import BaseView, View
