@@ -20,7 +20,7 @@
         {% if item | is_dropdown %}
           
         {% else %}
-        <a class="dropdown-item" href="{{ url_for(item.config.name) }}"> {{ item.config.title }} </a>
+        <a class="dropdown-item" href="{{ url_for(__name__~ ':' ~ item.config.name) }}"> {{ item.config.title }} </a>
         {% endif %}
     {% endfor %}
   </div>

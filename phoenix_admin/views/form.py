@@ -10,6 +10,7 @@ from starlette.responses import Response
 from starlette.templating import Jinja2Templates
 
 from phoenix_admin.fields.base import BaseField
+from phoenix_admin.responses import AsJsonResponse
 from phoenix_admin.utils import getval, qualname
 from phoenix_admin.views.base import View
 
@@ -97,11 +98,20 @@ class BaseFormView(View, Generic[_T]):
         if isinstance(result, Response):
             return result
 
-        data = result.model_dump(mode="json")
+        json_result = None
+        result_data = None
+        if isinstance(result, AsJsonResponse):
+            json_result = result.dump()
+            result_data = None
+
+        if isinstance(result, BaseModel):
+            result_data = result.model_dump(mode="json")
+
         rendered_template = template.render(
             request=request,
             view=self,
-            result=data,
+            result=result_data,
+            json_result=json_result,
             form_fields=await self.get_form_fields(),
         )
 
@@ -125,10 +135,16 @@ class BaseFormView(View, Generic[_T]):
             headers=Headers({"Content-Type": "text/html; charset=utf-8"}),
         )
 
-    async def get(self, ctx: RequestContext[_T]) -> Response | BaseModel:
+    async def get(
+        self,
+        ctx: RequestContext[_T],
+    ) -> Response | BaseModel | AsJsonResponse:
         return await self._get_default_response(ctx)
 
-    async def post(self, ctx: RequestContext[_T]) -> Response | BaseModel:
+    async def post(
+        self,
+        ctx: RequestContext[_T],
+    ) -> Response | BaseModel | AsJsonResponse:
         return await self._get_default_response(ctx)
 
     async def get_form_fields(self) -> Sequence[BaseField]:

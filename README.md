@@ -8,7 +8,7 @@
 
 - [x] Support FormView
 - [x] Support form rendering
-- [ ] Support displaying JSON result
+- [x] Support displaying JSON result
 - [ ] Support displaying SimpleResult (message, description, urls)
 
 ### Support Error Display: Form Errors, Pydantic Validation Errors, 404 Errors
@@ -35,7 +35,7 @@
 
 ### Support Mounting to Another ASGI Framework
 
-- [ ] Mount AdminApp to another ASGI app
+- [x] Mount AdminApp to another ASGI app
 
 ### Support Additional Templates
 
@@ -46,7 +46,7 @@
 
 ### Support Additional Static Files
 
-- [ ] Static file serving
+- [x] Static file serving
 - [ ] Multiple static directories
 
 ### Support Serializers

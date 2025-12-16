@@ -1,11 +1,12 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base.html" %}
 
+{% block content %}
 <div class="page-wrapper w-100 d-flex">
     <div class="mx-auto w-50">
         <div class="text-center">
             <h1 class="mb-3">{{ view.config.title }}</h1>
         </div>
-        {% if not result %}
+        {% if not (result is none or json_result is none) %}
         <form method="POST" enctype="multipart/form-data">
             <div class="card p-3">
                 {% for field in form_fields %}
@@ -17,11 +18,17 @@
                     {{ view.config.submit_button_text or 'Send' }}
                 </button>
             </div>
+        </form>
         {% endif %}
+
         {% if result %}
             {% include "datagrid/grid.html" %}
         {% endif %}
-        </form>
+
+        {% if json_result %}
+            {% include "json_result.html" %}
+        {% endif %}
+
     </div>
 </div>
 {% endblock %}

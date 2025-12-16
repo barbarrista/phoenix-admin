@@ -1,0 +1,33 @@
+{% block head %}
+<link
+  rel="stylesheet"
+  href="{{ url_for(__name__ ~ ':statics', path='css/copy.css') }}"
+/>
+{% endblock %}
+<div class="card p-3">
+  <div class="card-header">
+    {% if json_result.message %}
+    <h3 class="card-title">{{ json_result.message }}</h3>
+    {% endif %}
+  </div>
+
+  <div class="code-container mt-4">
+    <button
+      id="copy-btn"
+      class="btn btn-sm btn-outline-light copy-btn"
+      data-bs-toggle="tooltip"
+      data-bs-placement="top"
+      title="Copy"
+    >
+      <i class="ti ti-copy"></i>
+    </button>
+    <pre id="json-content"><code>{{ json_result.response | to_json }}</code></pre>
+  </div>
+</div>
+
+{% block script %}
+<script
+  type="text/javascript"
+  src="{{ url_for(__name__ ~ ':statics', path='js/copy.js') }}"
+></script>
+{% endblock %}

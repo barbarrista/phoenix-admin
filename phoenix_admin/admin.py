@@ -1,16 +1,18 @@
 from collections.abc import Awaitable, Callable
 from http import HTTPMethod
 
+import orjson
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
-from starlette.types import ASGIApp
 
 from phoenix_admin.config import ViewConfig
 from phoenix_admin.exceptions import PhoenixAdminError
 from phoenix_admin.jinja_helpers import raise_exception
+from phoenix_admin.protocols import HasMount
 from phoenix_admin.views.base import BaseView, View
 from phoenix_admin.views.drop_down import DropDown
 from phoenix_admin.views.form import BaseFormView
@@ -19,15 +21,17 @@ from phoenix_admin.views.link import LinkView
 
 
 class AdminApp:
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
-        app: Starlette,
+        app: Starlette | None = None,
+        *,
         base_url: str = "/admin",
         route_name: str = "admin",
         title: str = "Admin Panel",
         index_view: View | None = None,
+        debug: bool = False,
     ) -> None:
-        self.app = app
+        self._asgi_app = app or Starlette(debug=debug)
         self._views: list[BaseView] = []
         self._view_paths: list[str] = []
         self._title = title
@@ -37,6 +41,15 @@ class AdminApp:
 
         self._setup_jinja()
         self._create_index_view(index_view)
+        self._init_static_routes()
+
+    @property
+    def asgi_app(self) -> Starlette:
+        return self._asgi_app
+
+    def _init_static_routes(self) -> None:
+        statics = StaticFiles(packages=["phoenix_admin"])
+        self._asgi_app.mount("/statics", app=statics, name="statics")
 
     def _setup_jinja(self) -> None:
         jinja_env = Environment(
@@ -52,6 +65,12 @@ class AdminApp:
         self.templates.env.globals["views"] = self._views
         self.templates.env.globals["__name__"] = self.route_name
         self.templates.env.globals["raise"] = raise_exception
+        self.templates.env.filters["to_json"] = lambda data: orjson.dumps(
+            data,
+            default=str,
+            option=orjson.OPT_INDENT_2,
+        ).decode()
+
         self.templates.env.filters["is_dropdown"] = lambda view: isinstance(
             view, DropDown
         )
@@ -81,7 +100,7 @@ class AdminApp:
 
         if isinstance(view, BaseFormView | View):
             path = view.config.path
-            self.app.add_route(
+            self._asgi_app.add_route(
                 path=path,
                 route=self._handle_view(view),
                 methods=[HTTPMethod.GET, HTTPMethod.POST],
@@ -96,8 +115,8 @@ class AdminApp:
 
         return wrapper
 
-    def mount_to(self, app: ASGIApp) -> None:
-        raise NotImplementedError
+    def mount_to(self, app: HasMount) -> None:
+        app.mount(path=self.base_url, app=self._asgi_app, name=self.route_name)
 
     def _validate_view(self, view: View | DropDown | LinkView) -> None:
         if isinstance(view, LinkView):

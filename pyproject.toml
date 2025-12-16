@@ -5,6 +5,7 @@ authors = [
 
 dependencies = [
   "jinja2>=3.1.6",
+  "orjson>=3.11.5",
   "pydantic>=2.12.5",
   "python-multipart>=0.0.20",
   "starlette>=0.50.0",
@@ -31,7 +32,18 @@ include = ["phoenix_admin/*", "tests/*", "docs/*"]
 [tool.hatch.build.targets.wheel]
 include = ["phoenix_admin/*"]
 
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "$version"
+version_scheme = "pep440"
+version_provider = "uv"
+update_changelog_on_bump = true
+major_version_zero = true
 [dependency-groups]
+dev = [
+    "commitizen>=4.10.1",
+]
 lint = [
   "deptry>=0.24.0",
   "mypy>=1.19.0",
