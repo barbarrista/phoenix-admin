@@ -33,6 +33,12 @@
 - [ ] JWT/OAuth support
 - [ ] Keycloak auth
 
+### Support hooks
+
+- [ ] Before request
+- [ ] After request
+- [ ] After response
+
 ### Support Mounting to Another ASGI Framework
 
 - [x] Mount AdminApp to another ASGI app
@@ -54,6 +60,10 @@
 - [ ] Pydantic
 - [ ] MsgSpec
 - [ ] Custom serializers
+
+### Support exception handlers
+
+- [ ] Custom exception handlers
 
 ### Support Lifespan
 
