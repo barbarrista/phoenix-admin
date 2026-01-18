@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from typing import Any
 
 
@@ -6,7 +6,7 @@ from typing import Any
 class BaseField:
     _name: str = field(init=False, default="")
 
-    type: str
+    type: str = field(default="text", init=False)
     label: str | None = None
     value: Any | None = None
     required: bool = False
@@ -16,6 +16,7 @@ class BaseField:
     readonly: bool = False
     form_template = "form_fields/input.html"
     grid_item_template = "datagrid/default_item.html"
+    multiple: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -27,6 +28,24 @@ class BaseField:
     @name.setter
     def name(self, value: str) -> None:
         self._name = value
+
+    def copy(self, value: Any = None) -> "BaseField":  # noqa: ANN401
+        """Copy field with new value"""
+
+        data = {
+            dataclass_field.name: getattr(self, dataclass_field.name)
+            for dataclass_field in fields(self)
+        }
+        del data["_name"]
+        del data["type"]
+
+        instance = self.__class__(**data)
+        instance.name = self.name
+
+        if not isinstance(self, FileField):
+            instance.value = value
+
+        return instance
 
 
 @dataclass

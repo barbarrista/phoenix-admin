@@ -10,9 +10,16 @@
         <form method="POST" enctype="multipart/form-data">
             <div class="card p-3">
                 {% for field in form_fields %}
-                <div class="mb-3">
-                    {% include field.form_template %}
-                </div>
+                    {% with error=errors.get(field.name, None) if errors else None %}
+                    <div class="mb-3">
+                        {% include field.form_template %}
+                            {% if error %}
+                            <div class="invalid-feedback d-block">
+                                {{ error }}
+                            </div>
+                            {% endif %}
+                    </div>
+                    {% endwith %}
                 {% endfor %}
                 <button type="submit" class="mt-2 btn btn-primary">
                     {{ view.config.submit_button_text or 'Send' }}

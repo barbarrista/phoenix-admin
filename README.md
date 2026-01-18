@@ -13,8 +13,8 @@
 
 ### Support Error Display: Form Errors, Pydantic Validation Errors, 404 Errors
 
-- [ ] Form error rendering
-- [ ] Pydantic validation error handling
+- [x] Form error rendering
+- [x] Pydantic validation error handling
 - [ ] Custom 404 page
 - [ ] Error context propagation
 

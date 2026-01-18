@@ -8,6 +8,7 @@ dependencies = [
   "orjson>=3.11.5",
   "pydantic>=2.12.5",
   "python-multipart>=0.0.20",
+  "result>=0.17.0",
   "starlette>=0.50.0",
   "uvicorn>=0.38.0",
 ]
