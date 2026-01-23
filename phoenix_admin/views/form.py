@@ -1,5 +1,5 @@
 from collections import defaultdict
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from http import HTTPStatus
 from typing import Any, Final, Generic, get_args, get_type_hints
@@ -7,14 +7,14 @@ from typing import Any, Final, Generic, get_args, get_type_hints
 from jinja2 import Template
 from pydantic import BaseModel, ValidationError
 from result import Err
-from starlette.datastructures import Headers, UploadFile
+from starlette.datastructures import FormData, Headers, UploadFile
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.templating import Jinja2Templates
 
 from phoenix_admin.fields.base import BaseField, FileField
 from phoenix_admin.responses import AsJsonResponse
-from phoenix_admin.utils import getval, qualname
+from phoenix_admin.utils import clean_field, getval, qualname
 from phoenix_admin.views.base import View
 from phoenix_admin.views.form_validation.pydantic_ import (
     PydanticModelValidator,
@@ -91,6 +91,7 @@ class BaseFormView(View, Generic[TModel]):
                 if isinstance(form_data_result, Err):
                     result = await self._render_errors(
                         template=template,
+                        form_data=form_data,
                         ctx=RequestContext(templates=templates, request=request),
                         exc=form_data_result.err_value,
                     )
@@ -133,7 +134,7 @@ class BaseFormView(View, Generic[TModel]):
             headers=self.default_headers,
         )
 
-    async def _get_form_data(self, request: Request) -> Mapping[str, Any]:
+    async def _get_form_data(self, request: Request) -> dict[str, Any]:
         """Prepares form data for Pydantic validation.
 
         Extracts form data from the request and removes empty UploadFile objects,
@@ -157,31 +158,17 @@ class BaseFormView(View, Generic[TModel]):
             field.name for field in self.form_fields if isinstance(field, FileField)
         }
 
-        multiple_fields = tuple(item.name for item in self.form_fields if item.multiple)
-        form_data: MutableMapping[str, Any] = {
-            key: value for key, value in raw_data.items() if key not in multiple_fields
+        list_fields = tuple(item.name for item in self.form_fields if item.multiple)
+        form_data: dict[str, Any] = {
+            cleaned_key: value
+            for key, value in raw_data.items()
+            if (cleaned_key := clean_field(key)) not in list_fields
         }
 
-        multiple_data = defaultdict(list)
-        for field, value in raw_data.multi_items():
-            if field not in multiple_fields:
-                continue
-
-            multiple_data[field].append(value)
-
+        multiple_data = validate_list_fields(raw_data, list_fields=list_fields)
         form_data.update(multiple_data)
-
-        for file_field in file_fields:
-            upload_file = form_data.get(file_field)
-            if not isinstance(upload_file, UploadFile):
-                continue
-
-            filename = (upload_file.filename or "").strip()
-            if not filename and upload_file.size == 0:
-                # Exclude empty UploadFile objects
-                del form_data[file_field]
-
-        return form_data
+        form_data = _validate_files(file_fields=file_fields, form_data=form_data)
+        return form_data  # noqa: RET504
 
     async def _get_default_response(self, ctx: RequestContext[TModel]) -> Response:
         template = ctx.templates.get_template(self.template)
@@ -214,14 +201,14 @@ class BaseFormView(View, Generic[TModel]):
         template: Template,
         ctx: RequestContext[TModel],
         *,
+        form_data: Mapping[str, Any],
         exc: ValidationError,
     ) -> Response | BaseModel | AsJsonResponse:
         errors = get_form_errors(exc)
-        raw_data = await ctx.request.form()
         rendered_template = template.render(
             request=ctx.request,
             view=self,
-            form_fields=await self.get_form_fields(raw_data),
+            form_fields=await self.get_form_fields(form_data),
             result_fields=None,
             errors=errors,
         )
@@ -238,7 +225,42 @@ class BaseFormView(View, Generic[TModel]):
         if data is None:
             return self.form_fields
 
-        fields = {field.name: field for field in self.form_fields}
-        return [
-            fields[field_name].copy(value=value) for field_name, value in data.items()
-        ]
+        return [field.copy(value=data.get(field.name)) for field in self.form_fields]
+
+
+def validate_list_fields(
+    raw_data: FormData,
+    *,
+    list_fields: tuple[str, ...],
+) -> defaultdict[str, list[Any]]:
+    multiple_data = defaultdict(list)
+    multiple_data_fields = set()
+    for field, value in raw_data.multi_items():
+        if (cleaned_field := clean_field(field)) not in list_fields:
+            continue
+
+        multiple_data_fields.add(cleaned_field)
+        if value is None or value == "":
+            continue
+
+        multiple_data[cleaned_field].append(value)
+
+    for field in multiple_data_fields:
+        if not any(multiple_data[field]):
+            multiple_data[field] = []
+
+    return multiple_data
+
+
+def _validate_files(file_fields: set[str], form_data: dict[str, Any]) -> dict[str, Any]:
+    for file_field in file_fields:
+        upload_file = form_data.get(file_field)
+        if not isinstance(upload_file, UploadFile):
+            continue
+
+        filename = (upload_file.filename or "").strip()
+        if not filename and upload_file.size == 0:
+            # Exclude empty UploadFile objects
+            del form_data[file_field]
+
+    return form_data

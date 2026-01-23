@@ -25,3 +25,7 @@ def qualname(obj: object) -> str:
         return obj.__qualname__
 
     return obj.__class__.__qualname__
+
+
+def clean_field(field_name: str) -> str:
+    return field_name.removesuffix("[]")

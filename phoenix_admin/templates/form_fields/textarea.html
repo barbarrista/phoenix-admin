@@ -1,10 +1,13 @@
-<label class="form-label">{{ field.name }}</label>
+{% if field.label %}
+  <label class="form-label">{{ field.label }}</label>
+{% endif %}
 <textarea id="{{ field.name }}" 
+class="form-control"
 data-bs-toggle="autosize"
-name="{{ field.name }}"
+name="{{ field.name }}{% if multiple %}[]{% endif %}" 
 {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
 {% if field.required %}required{% endif %}
 {% if field.rows %}rows="{{ field.rows }}"{% endif %}
 {% if field.cols %}cols="{{ field.cols }}"{% endif %}>
-{{- field.value or '' -}}
+{{- item_value or field.value or '' -}}
 </textarea>

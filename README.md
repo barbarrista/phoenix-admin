@@ -16,7 +16,6 @@
 - [x] Form error rendering
 - [x] Pydantic validation error handling
 - [ ] Custom 404 page
-- [ ] Error context propagation
 
 ### Support Middlewares
 

@@ -1,4 +1,6 @@
-<label class="form-label">{{ field.name }}</label>
+{% if field.label %}
+  <label class="form-label">{{ field.label }}</label>
+{% endif %}
 <input type="file" 
 id="{{ field.name }}" 
 name="{{ field.name }}"

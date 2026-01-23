@@ -2,12 +2,11 @@
   <label class="form-label">{{ field.label }}</label>
 {% endif %}
 <input
-  type="password"
+  type="datetime-local"
   class="form-control"
   id="{{ field.name }}" 
   name="{{ field.name }}{% if multiple %}[]{% endif %}" 
   value="{{ item_value or field.value or '' }}"
-  {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
   {% if field.required %}required{% endif %}
   {% if field.readonly %}readonly{% endif %}
 />

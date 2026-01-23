@@ -1,4 +1,6 @@
-<label class="form-label">{{ field.name }}</label>
+{% if field.label %}
+  <label class="form-label">{{ field.label }}</label>
+{% endif %}
 <select id="{{ field.name }}" 
 name="{{ field.name }}"
 {% if field.required %}required{% endif %}>
