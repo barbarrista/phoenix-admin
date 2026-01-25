@@ -10,6 +10,7 @@
 - [x] Support form rendering
 - [x] Support displaying JSON result
 - [ ] Support displaying SimpleResult (message, description, urls)
+- [x] Support StructureField (define field as Pydantic model and render depends form)
 
 ### Support Error Display: Form Errors, Pydantic Validation Errors, 404 Errors
 

@@ -1,8 +1,9 @@
 {% if field.label %}
   <label class="form-label">{{ field.label }}</label>
 {% endif %}
-<select id="{{ field.name }}" 
-name="{{ field.name }}"
+{% set name_prefix = main_field_name + '.' if main_field_name else '' %}
+<select id="{{ name_prefix }}{{ field.name }}" 
+name="{{ name_prefix }}{{ field.name }}"
 {% if field.required %}required{% endif %}>
 {% if field.placeholder %}
 <option value="" disabled selected>{{ field.placeholder }}</option>

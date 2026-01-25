@@ -2,25 +2,39 @@
   <label class="form-label">{{ field.label }}</label>
 {% endif %}
 <div class="list-container" id="list-container-{{ field.name }}">
-  {% for item_value in field.value or [{}] %}
-  <div class="input-group mb-2">
-    {% with field=field.get_child_field(), value=item_value, multiple=true %}
-    {% include field.form_template | safe %}
-      {% with error=errors.get(field.get_name_with_index(loop.index0), None) if errors else None %}
-        {% if error %}
-          <div class="invalid-feedback d-block">
-            {{ error }}
-          </div>
-          {% endif %}
+  {% set values = form_data.get(field.name, []) if form_data else [] %}
+  {% if values %}
+    {% for item_value in values %}
+      <div class="input-group mb-2">
+        {% with field=field.get_child_field(), value=item_value, multiple=true %}
+        {% include field.form_template | safe %}
+          {% with error=errors.get(field.get_name_with_index(loop.index0), None) if errors else None %}
+            {% if error %}
+              <div class="invalid-feedback d-block">
+                {{ error }}
+              </div>
+              {% endif %}
+            {% endwith %} 
         {% endwith %} 
-    {% endwith %} 
-    <button
-      type="button"
-      class="btn btn-outline-danger"
-      onclick="removeListItem(this)"
-    >✕</button>
-  </div>
-  {% endfor %}
+        <button
+          type="button"
+          class="btn btn-outline-danger"
+          onclick="removeListItem(this)"
+        >✕</button>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="input-group mb-2">
+      {% with field=field.get_child_field(), value=None, multiple=true %}
+        {% include field.form_template | safe %}
+      {% endwith %} 
+      <button
+        type="button"
+        class="btn btn-outline-danger"
+        onclick="removeListItem(this)"
+      >✕</button>
+    </div>
+  {% endif %}
 </div>
 
 <button

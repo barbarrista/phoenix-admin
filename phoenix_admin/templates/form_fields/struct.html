@@ -1,0 +1,26 @@
+{% if field.label %}
+  <label class="form-label mt-3">{{ field.label }}</label>
+{% endif %}
+<div class="struct-container" id="struct-container-{{ field.name }}">
+  <div class="card p-3">
+    {% for struct_field in field.fields %}
+      {% set error_key = field.name + '.' +  struct_field.name%}
+
+      {%
+         with field=struct_field,
+         error=errors.get(error_key, None) if errors else None,
+         main_field_name=field.name,
+         form_data=form_data.get(field.name, None) if form_data else None
+       %}
+        <div class="mb-3">
+            {% include field.form_template %}
+                {% if error %}
+                  <div class="invalid-feedback d-block">
+                      {{ error }}
+                  </div>
+                {% endif %}
+        </div>
+        {% endwith %}
+    {% endfor %}
+</div>
+

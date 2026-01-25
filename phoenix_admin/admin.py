@@ -11,6 +11,7 @@ from starlette.templating import Jinja2Templates
 
 from phoenix_admin.config import ViewConfig
 from phoenix_admin.exceptions import PhoenixAdminError
+from phoenix_admin.fields.base import StructField
 from phoenix_admin.jinja_helpers import raise_exception
 from phoenix_admin.protocols import HasMount
 from phoenix_admin.views.base import BaseView, View
@@ -79,6 +80,9 @@ class AdminApp:
         )
         self.templates.env.filters["is_link_view"] = lambda view: isinstance(
             view, LinkView
+        )
+        self.templates.env.filters["is_struct_field"] = lambda field: isinstance(
+            field, StructField
         )
 
     def _create_index_view(self, index_view: View | None = None) -> None:

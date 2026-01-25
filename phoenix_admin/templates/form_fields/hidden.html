@@ -1,6 +1,7 @@
+{% set name_prefix = main_field_name + '.' if main_field_name else '' %}
 <input
   type="hidden"
-  id="{{ field.name }}"
-  name="{{ field.name }}"
-  value="{{ field.value or '' }}"
+  id="{{ name_prefix }}{{ field.name }}"
+  name="{{ name_prefix }}{{ field.name }}"
+  value="{{ (form_data.get(field.name, '') or '') if form_data else '' or '' }}"
 />

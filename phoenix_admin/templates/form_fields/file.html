@@ -1,9 +1,10 @@
 {% if field.label %}
   <label class="form-label">{{ field.label }}</label>
 {% endif %}
+{% set name_prefix = main_field_name + '.' if main_field_name else '' %}
 <input type="file" 
-id="{{ field.name }}" 
-name="{{ field.name }}"
+id="{{ name_prefix }}{{ field.name }}" 
+name="{{ name_prefix }}{{ field.name }}{% if multiple %}[]{% endif %}"
 {% if field.accept %}accept="{{ field.accept }}"{% endif %}
 {% if field.multiple %}multiple{% endif %}
 {% if field.required %}required{% endif %}/>

@@ -1,13 +1,14 @@
 {% if field.label %}
   <label class="form-label">{{ field.label }}</label>
 {% endif %}
-<textarea id="{{ field.name }}" 
+{% set name_prefix = main_field_name + '.' if main_field_name else '' %}
+<textarea id="{{ name_prefix }}{{ field.name }}" 
 class="form-control"
 data-bs-toggle="autosize"
-name="{{ field.name }}{% if multiple %}[]{% endif %}" 
+name="{{ name_prefix }}{% if multiple %}[]{% endif %}" 
 {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
 {% if field.required %}required{% endif %}
 {% if field.rows %}rows="{{ field.rows }}"{% endif %}
 {% if field.cols %}cols="{{ field.cols }}"{% endif %}>
-{{- item_value or field.value or '' -}}
+{{- item_value or (form_data.get(field.name, '') or '') if form_data else '' or '' -}}
 </textarea>
