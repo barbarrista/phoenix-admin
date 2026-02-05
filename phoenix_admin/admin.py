@@ -4,16 +4,19 @@ from http import HTTPMethod
 import orjson
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
+from phoenix_admin.auth.provider import BaseAuthProvider
 from phoenix_admin.config import ViewConfig
+from phoenix_admin.constants import INDEX_ROUTE_NAME, STATICS_ROUTE_NAME, USER_SCOPE_KEY
 from phoenix_admin.exceptions import PhoenixAdminError
 from phoenix_admin.fields.base import StructField
-from phoenix_admin.jinja_helpers import raise_exception
 from phoenix_admin.protocols import HasMount
+from phoenix_admin.state import AppState
 from phoenix_admin.views.base import BaseView, View
 from phoenix_admin.views.drop_down import DropDown
 from phoenix_admin.views.form import BaseFormView
@@ -28,15 +31,18 @@ class AdminApp:
         *,
         base_url: str = "/admin",
         route_name: str = "admin",
-        title: str = "Admin Panel",
+        title: str = "Phoenix Admin",
         index_view: View | None = None,
         debug: bool = False,
+        middlewares: list[Middleware] | None = None,
+        auth_provider: BaseAuthProvider | None = None,
     ) -> None:
         self._asgi_app = app or Starlette(debug=debug)
         self._views: list[BaseView] = []
         self._view_paths: list[str] = []
         self._title = title
 
+        self.middlewares = middlewares or []
         self.base_url = base_url
         self.route_name = route_name
 
@@ -44,13 +50,41 @@ class AdminApp:
         self._create_index_view(index_view)
         self._init_static_routes()
 
+        self._set_up_asgi_app()
+        self._set_up_auth(auth_provider)
+
+        # ↓ Always call this at the end of the method once ↓
+        self._extend_asgi_app_middlewares()
+
+    def _extend_asgi_app_middlewares(self) -> None:
+        self._asgi_app.user_middleware.extend(self.middlewares)
+
+    def _set_up_asgi_app(self) -> None:
+        self.asgi_app.state.app_state = AppState(
+            self.asgi_app.state,
+            admin_app=self,
+            admin_route_name=self.route_name,
+        )
+
+    def _set_up_auth(
+        self,
+        auth_provider: BaseAuthProvider | None = None,
+    ) -> None:
+        self._auth_provider = auth_provider
+        if self._auth_provider is None:
+            return
+
+        self._auth_provider.add_routes_to_app(self)
+        middleware = self._auth_provider.get_auth_middleware(admin_app=self)
+        self.middlewares.append(middleware)
+
     @property
     def asgi_app(self) -> Starlette:
         return self._asgi_app
 
     def _init_static_routes(self) -> None:
         statics = StaticFiles(packages=["phoenix_admin"])
-        self._asgi_app.mount("/statics", app=statics, name="statics")
+        self._asgi_app.mount("/statics", app=statics, name=STATICS_ROUTE_NAME)
 
     def _setup_jinja(self) -> None:
         jinja_env = Environment(
@@ -64,8 +98,8 @@ class AdminApp:
         )
         self.templates = Jinja2Templates(env=jinja_env)
         self.templates.env.globals["views"] = self._views
-        self.templates.env.globals["__name__"] = self.route_name
-        self.templates.env.globals["raise"] = raise_exception
+        self.templates.env.globals["__admin_panel_title__"] = self._title
+        self.templates.env.globals["__admin_route_name__"] = self.route_name
         self.templates.env.filters["to_json"] = lambda data: orjson.dumps(
             data,
             default=str,
@@ -84,18 +118,22 @@ class AdminApp:
         self.templates.env.filters["is_struct_field"] = lambda field: isinstance(
             field, StructField
         )
+        self.templates.env.filters["is_user_authenticated"] = (
+            lambda request: USER_SCOPE_KEY in request.scope
+        )
 
     def _create_index_view(self, index_view: View | None = None) -> None:
         index_view = index_view or IndexView(
-            config=ViewConfig(title=self._title, name="index", path="/")
+            config=ViewConfig(title=self._title, name=INDEX_ROUTE_NAME, path="/")
         )
-        self.add_view(index_view)
+        self.add_view(index_view, view_name=INDEX_ROUTE_NAME)
 
     def add_view(
         self,
         view: View | DropDown | LinkView,
         *,
         can_append_in_list: bool = True,
+        view_name: str | None = None,
     ) -> None:
         self._validate_view(view)
         if isinstance(view, DropDown):
@@ -108,7 +146,7 @@ class AdminApp:
                 path=path,
                 route=self._handle_view(view),
                 methods=[HTTPMethod.GET, HTTPMethod.POST],
-                name=view.config.name,
+                name=view_name or view.config.name,
             )
         if can_append_in_list:
             self._views.append(view)

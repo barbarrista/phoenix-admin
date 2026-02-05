@@ -1,7 +1,7 @@
 {% block head %}
 <link
   rel="stylesheet"
-  href="{{ url_for(__name__ ~ ':statics', path='css/copy.css') }}"
+  href="{{ url_for(__admin_route_name__ ~ ':statics', path='css/copy.css') }}"
 />
 {% endblock %}
 <div class="card p-3">
@@ -28,6 +28,6 @@
 {% block script %}
 <script
   type="text/javascript"
-  src="{{ url_for(__name__ ~ ':statics', path='js/copy.js') }}"
+  src="{{ url_for(__admin_route_name__ ~ ':statics', path='js/copy.js') }}"
 ></script>
 {% endblock %}

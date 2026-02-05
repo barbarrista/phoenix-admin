@@ -10,13 +10,15 @@
         <form method="POST" enctype="multipart/form-data">
             <div class="card p-3">
                 {% for field in form_fields %}
-                    {% with error=errors.get(field.name, None) if errors else None %}
+                    {% with error=form_errors.get(field.name, None) if form_errors else None %}
                     <div class="mb-3">
                         {% include field.form_template %}
                             {% if error %}
-                            <div class="invalid-feedback d-block">
-                                {{ error }}
-                            </div>
+                                {% for err_value in error %}
+                                <div class="invalid-feedback d-block">
+                                    {{ err_value }}
+                                </div>
+                                {% endfor %}
                             {% endif %}
                     </div>
                     {% endwith %}

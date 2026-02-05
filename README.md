@@ -12,6 +12,10 @@
 - [ ] Support displaying SimpleResult (message, description, urls)
 - [x] Support StructureField (define field as Pydantic model and render depends form)
 
+### JsonView
+
+- [ ] Support JsonView (Send JSON in specific field)
+
 ### Support Error Display: Form Errors, Pydantic Validation Errors, 404 Errors
 
 - [x] Form error rendering
@@ -24,14 +28,13 @@
 - [ ] Error handling middleware
 - [ ] Middleware configuration
 
-### Support Authorization: AuthMiddleware, AuthProvider
+### Support Security/Authorization: AuthMiddleware, AuthProvider
 
-- [ ] Authentication middleware
-- [ ] Authorization providers
-- [ ] User session management
+- [x] Authentication middleware
+- [x] Authorization providers
 - [ ] Permission system
-- [ ] JWT/OAuth support
 - [ ] Keycloak auth
+- [ ] CSRF Token
 
 ### Support hooks
 

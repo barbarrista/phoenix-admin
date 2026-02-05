@@ -8,17 +8,19 @@
 
       {%
          with field=struct_field,
-         error=errors.get(error_key, None) if errors else None,
+         error=form_errors.get(error_key, None) if form_errors else None,
          main_field_name=field.name,
          form_data=form_data.get(field.name, None) if form_data else None
        %}
         <div class="mb-3">
             {% include field.form_template %}
-                {% if error %}
-                  <div class="invalid-feedback d-block">
-                      {{ error }}
-                  </div>
-                {% endif %}
+            {% if error %}
+              {% for err_value in error %}
+                <div class="invalid-feedback d-block">
+                  {{ err_value }}
+                </div>
+              {% endfor %}
+            {% endif %}
         </div>
         {% endwith %}
     {% endfor %}

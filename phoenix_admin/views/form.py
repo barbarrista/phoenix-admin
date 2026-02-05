@@ -19,6 +19,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.templating import Jinja2Templates
 
+from phoenix_admin.exceptions import FormValidationError
 from phoenix_admin.fields.base import BaseField, ListField, StructField
 from phoenix_admin.responses import AsJsonResponse
 from phoenix_admin.utils import getval, qualname, remove_empty_values, transform_to_dict
@@ -214,13 +215,13 @@ class BaseFormView(View, Generic[TModel]):
         form_data: Mapping[str, Any],
         exc: ValidationError,
     ) -> Response | BaseModel | AsJsonResponse:
-        errors = get_form_errors(exc)
+        form_errors = get_form_errors(exc)
         rendered_template = template.render(
             request=ctx.request,
             view=self,
             form_fields=self.form_fields,
             form_data=form_data,
-            errors=errors,
+            form_errors=FormValidationError(form_errors),
         )
         return Response(
             status_code=HTTPStatus.BAD_REQUEST,

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign In</title>
+
+    <link
+      rel="stylesheet"
+      href="{{ url_for(__admin_route_name__ ~ ':statics', path='css/sign_in.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for(__admin_route_name__ ~ ':statics', path='css/styles.css') }}"
+    />
+
+    <!-- Tabler CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
+    />
+  </head>
+  <body>
+    <div class="login-card">
+      <div class="login-header">
+        <div class="brand-logo">
+          <i class="ti ti-shield-lock me-2"></i>{{ __admin_panel_title__ }}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body p-4">
+          <form id="loginForm" method="POST">
+            <div class="mb-3">
+              <label class="form-label">Username</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="ti ti-user"></i>
+                </span>
+                {% with username_err=form_errors.get('username') if form_errors else None %}
+                  <input
+                  type="text"
+                  class="form-control {% if username_err %}is-invalid{% endif %}"
+                  id="username"
+                  name="username"
+                  placeholder="Enter username"
+                  required
+                  />
+                    {% for item in username_err or [] %}
+                    <div class="invalid-feedback d-block">
+                      {{ item }}
+                    </div>
+                    {% endfor %}
+                {% endwith %}
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="ti ti-lock"></i>
+                </span>
+                {% with password_err=form_errors.get('password') if form_errors else None %}
+                  <input
+                    type="password"
+                    class="form-control {% if password_err %}is-invalid{% endif %}"
+                    id="password"
+                    name="password"
+                    placeholder="Enter password"
+                    required
+                  />
+                  <button
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    id="togglePassword"
+                  >
+                    <i class="ti ti-eye"></i>
+                  </button>
+                  {% for item in password_err or [] %}
+                  <div class="invalid-feedback d-block">
+                    {{ item }}
+                  </div>
+                  {% endfor %}
+                {% endwith %}
+              </div>
+            </div>
+            <div class="mb-3">
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="ti ti-login me-2"></i>
+                Sign In
+              </button>
+            </div>
+            <div
+              id="successMessage"
+              class="alert alert-success d-none"
+              role="alert"
+            >
+              <i class="ti ti-circle-check me-2"></i>
+              <span id="successText"></span>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {% if error_message %}
+      <div class="text-center mt-3 p-3">
+        <div class="alert alert-danger errorMessage" role="alert">
+          <span>
+            <i class="ti ti-info-circle me-2"></i>
+            {{ error_message }}
+          </span>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Tabler JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
+    <script
+      type="text/javascript"
+      src="{{ url_for(__admin_route_name__ ~ ':statics', path='js/login.js') }}"
+    ></script>
+  </body>
+</html>

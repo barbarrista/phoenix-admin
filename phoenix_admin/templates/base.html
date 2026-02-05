@@ -16,6 +16,10 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
     />
+    <link
+    rel="stylesheet"
+    href="{{ url_for(__admin_route_name__ ~ ':statics', path='css/styles.css') }}"
+    />
     {% block head %}
     {% endblock %}
   </head>
@@ -39,15 +43,7 @@
           </button>
 
           <h1 class="navbar-brand navbar-brand-autodark">
-            <a href="/">
-              <img
-                src="./static/logo.svg"
-                width="110"
-                height="32"
-                alt="Phoenix Admin"
-                class="navbar-brand-image"
-              />
-            </a>
+            <a href="{{ url_for(__admin_route_name__ ~ ':index') }}">{{ __admin_panel_title__ }}</a>
           </h1>
 
           <div class="collapse navbar-collapse" id="sidebar-menu">
@@ -72,16 +68,31 @@
 
       <div class="page-wrapper">
         <header class="navbar navbar-expand-md navbar-light d-print-none">
-          <div class="container-xl">
-            <button
-              class="navbar-toggler"
-              type="button"
-              data-bs-toggle="collapse"
-              data-bs-target="#navbar-menu"
-            >
-              <span class="navbar-toggler-icon"></span>
-            </button>
-          </div>
+          <div class="container-xl d-flex justify-content-end">
+            {% if request | is_user_authenticated %}
+            {% set request_user=request.user %}
+              <div class="nav-item dropdown">
+                <a href="#" class="nav-link d-flex lh-1 p-0 px-2" data-bs-toggle="dropdown" aria-label="Open user menu">
+                  {% if request_user.avatar_url %}
+                    <span class="avatar avatar-sm" style="background-image: url({{ request.user.avatar_url }})"></span>
+                  {% else %}
+                    <span class="avatar avatar-sm"><i class="ti ti-user"></i></span>
+                  {% endif %}
+                  <div class="d-none d-xl-block ps-2">
+                    <div>{{ request_user.username }}</div>
+                    {% if request_user.info %}
+                      <div class="mt-1 small text-secondary"></div>
+                    {% endif %}
+                  </div>
+                </a>
+                <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                  <form action="{{ url_for(__admin_route_name__ ~ ':logout') }}" method="POST" style="display: inline;">
+                    <button type="submit" class="dropdown-item border-0 w-100 text-start">Sign Out</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          {% endif %}
         </header>
 
         <div class="page-body">
@@ -96,9 +107,7 @@
             <div class="row text-center align-items-center flex-row-reverse">
               <div class="col-lg-auto ms-lg-auto">
                 <ul class="list-inline list-inline-dots mb-0">
-                  <li class="list-inline-item">
-                    <a href="#" class="link-secondary">Docs</a>
-                  </li>
+                <!-- Placeholder -->
                 </ul>
               </div>
             </div>
