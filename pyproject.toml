@@ -23,6 +23,11 @@ version = "0.0.1"
 [project.urls]
 "GitHub" = "https://github.com/barbarrista/phoenix-admin"
 
+[project.optional-dependencies]
+keycloak = [
+    "python-keycloak>=7.0.3",
+]
+
 [build-system]
 build-backend = "hatchling.build"
 requires = ["hatchling"]

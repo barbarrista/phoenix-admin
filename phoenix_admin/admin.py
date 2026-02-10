@@ -75,8 +75,8 @@ class AdminApp:
             return
 
         self._auth_provider.add_routes_to_app(self)
-        middleware = self._auth_provider.get_auth_middleware(admin_app=self)
-        self.middlewares.append(middleware)
+        middlewares = self._auth_provider.get_depends_middlewares(admin_app=self)
+        self.middlewares.extend(middlewares)
 
     @property
     def asgi_app(self) -> Starlette:
