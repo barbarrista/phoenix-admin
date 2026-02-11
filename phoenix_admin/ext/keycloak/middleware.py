@@ -11,6 +11,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp
 
 from _logger import logger
+from phoenix_admin.state import get_app_state
 from phoenix_admin.utils import set_tokens_to_cookie, set_tokens_to_state
 
 if TYPE_CHECKING:
@@ -35,6 +36,7 @@ class RefreshTokenMiddleware(BaseHTTPMiddleware):
         request: Request,
         call_next: RequestResponseEndpoint,
     ) -> Response:
+        state = get_app_state(request)
         raw_token = request.cookies.get(self._cookie_names.access)
         refresh_token = request.cookies.get(self._cookie_names.refresh)
 
@@ -52,6 +54,7 @@ class RefreshTokenMiddleware(BaseHTTPMiddleware):
                 response,
                 tokens=tokens,
                 token_names=self._cookie_names,
+                path=state.admin_app.base_url,
             )
             return response
 
@@ -64,3 +67,5 @@ class RefreshTokenMiddleware(BaseHTTPMiddleware):
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception(exc)
+
+        return None

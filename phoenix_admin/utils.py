@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from inspect import isclass
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from urllib.parse import parse_qs
 
 from starlette.datastructures import UploadFile
@@ -114,6 +114,7 @@ def set_tokens_to_cookie(
     *,
     tokens: dict[str, Any],
     token_names: TokenCookieNames,
+    path: str,
 ) -> None:
     now = utc_now()
     response.set_cookie(
@@ -122,7 +123,8 @@ def set_tokens_to_cookie(
         secure=True,
         httponly=True,
         expires=now + timedelta(seconds=tokens["expires_in"]),
-        samesite=None,
+        samesite="lax",
+        path=path,
     )
     response.set_cookie(
         key=token_names.refresh,
@@ -130,7 +132,8 @@ def set_tokens_to_cookie(
         secure=True,
         httponly=True,
         expires=now + timedelta(seconds=tokens["refresh_expires_in"]),
-        samesite=None,
+        samesite="lax",
+        path=path,
     )
 
 
@@ -157,8 +160,9 @@ def _get_tokens_from_state(
     request: Request,
     *,
     token_name: str,
-) -> None:
-    return getattr(request.state, _TOKENS_FIELD_NAME, {}).get(token_name)
+) -> str | None:
+    result = getattr(request.state, _TOKENS_FIELD_NAME, {}).get(token_name)
+    return cast("str | None", result)
 
 
 def get_tokens_from_request(request: Request, token_name: str) -> str | None:

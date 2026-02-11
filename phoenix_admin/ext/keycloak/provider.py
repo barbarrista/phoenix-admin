@@ -83,6 +83,7 @@ class KeycloakAuthProvider(BaseAuthProvider):
                 response,
                 tokens=tokens,
                 token_names=self._cookie_names,
+                path=state.admin_app.base_url,
             )
             return response
 
@@ -126,6 +127,7 @@ class KeycloakAuthProvider(BaseAuthProvider):
             response,
             tokens=raw_tokens,
             token_names=self._cookie_names,
+            path=state.admin_app.base_url,
         )
         return response
 
