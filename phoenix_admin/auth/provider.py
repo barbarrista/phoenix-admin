@@ -51,6 +51,10 @@ class BaseAuthProvider(ABC):
     def not_login_required_routes(self) -> list[str]:
         return [self.sign_in_route_name, self.sign_out_route_name, STATICS_ROUTE_NAME]
 
+    @property
+    def routes_for_redirect_to_index(self) -> list[str]:
+        return [self.sign_in_route_name]
+
     @abstractmethod
     async def get_sign_in_response(self, request: Request) -> Response:
         raise NotImplementedError

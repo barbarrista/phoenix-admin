@@ -137,6 +137,28 @@ def set_tokens_to_cookie(
     )
 
 
+def remove_tokens_from_cookies(
+    response: Response,
+    *,
+    token_names: TokenCookieNames,
+    path: str,
+) -> None:
+    response.delete_cookie(
+        key=token_names.access,
+        secure=True,
+        httponly=True,
+        samesite="lax",
+        path=path,
+    )
+    response.delete_cookie(
+        key=token_names.refresh,
+        secure=True,
+        httponly=True,
+        samesite="lax",
+        path=path,
+    )
+
+
 _TOKENS_FIELD_NAME = "__tokens__"
 
 

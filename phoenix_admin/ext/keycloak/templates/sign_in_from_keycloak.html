@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign In</title>
+
+    <link
+      rel="stylesheet"
+      href="{{ url_for(__admin_route_name__ ~ ':statics', path='css/sign_in.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for(__admin_route_name__ ~ ':statics', path='css/styles.css') }}"
+    />
+
+    <!-- Tabler CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
+    />
+  </head>
+  <body>
+    <div class="login-card">
+      <div class="login-header">
+        <div class="brand-logo">
+          <i class="ti ti-shield-lock me-2"></i>{{ __admin_panel_title__ }}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body p-4">
+          <div class="mb-3">
+              <a href="{{ url_for(__admin_route_name__ ~ ':sign_in') }}" class="btn btn-primary w-100"><i class="ti ti-login me-2"></i>Sign In with Keycloak</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabler JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
+  </body>
+</html>

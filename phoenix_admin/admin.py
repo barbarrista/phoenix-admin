@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable
 from http import HTTPMethod
+from typing import Final
 
 import orjson
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PackageLoader
@@ -37,14 +38,14 @@ class AdminApp:
         middlewares: list[Middleware] | None = None,
         auth_provider: BaseAuthProvider | None = None,
     ) -> None:
-        self._asgi_app = app or Starlette(debug=debug)
+        self._asgi_app: Final = app or Starlette(debug=debug)
         self._views: list[BaseView] = []
         self._view_paths: list[str] = []
-        self._title = title
+        self._title: Final = title
 
         self.middlewares = middlewares or []
-        self.base_url = base_url
-        self.route_name = route_name
+        self.base_url: Final = base_url
+        self.route_name: Final = route_name
 
         self._setup_jinja()
         self._create_index_view(index_view)
@@ -70,10 +71,10 @@ class AdminApp:
         self,
         auth_provider: BaseAuthProvider | None = None,
     ) -> None:
-        self._auth_provider = auth_provider
-        if self._auth_provider is None:
+        if auth_provider is None:
             return
 
+        self._auth_provider = auth_provider
         self._auth_provider.add_routes_to_app(self)
         middlewares = self._auth_provider.get_depends_middlewares(admin_app=self)
         self.middlewares.extend(middlewares)
@@ -92,6 +93,7 @@ class AdminApp:
                 (
                     FileSystemLoader("templates"),
                     PackageLoader("phoenix_admin", "templates"),
+                    PackageLoader("phoenix_admin.ext.keycloak", "templates"),
                 )
             ),
             autoescape=True,
