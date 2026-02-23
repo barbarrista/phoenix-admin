@@ -25,6 +25,7 @@ version = "0.0.1"
 
 [project.optional-dependencies]
 keycloak = [
+    "jwcrypto>=1.5.6",
     "python-keycloak>=7.0.3",
 ]
 

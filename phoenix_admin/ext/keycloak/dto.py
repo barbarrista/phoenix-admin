@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Generic
 
 from phoenix_admin.ext.keycloak.types import RawAccessTokenType, TToken_co
@@ -41,3 +42,4 @@ class KeycloakConfig(Generic[TToken_co]):
     cookie_names: TokenCookieNames = DEFAULT_TOKEN_COOKIE_NAMES
     scope: str = "openid"
     grant_type: str = "authorization_code"
+    public_key_cache_ttl: timedelta = timedelta(hours=1)

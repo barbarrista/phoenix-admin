@@ -1,7 +1,9 @@
+import asyncio
 from collections.abc import Sequence
 from http import HTTPMethod
 from typing import TYPE_CHECKING, Final, Generic
 
+from jwcrypto import jwk
 from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
@@ -9,6 +11,7 @@ from starlette.routing import Route
 
 from phoenix_admin.admin import AdminApp
 from phoenix_admin.auth.provider import BaseAuthProvider, create_endpoint_handler
+from phoenix_admin.cached_resolver import CachedResolver, Partial
 from phoenix_admin.ext.keycloak.dto import (
     CallbackUrl,
     KeycloakConfig,
@@ -54,6 +57,12 @@ class KeycloakAuthProvider(BaseAuthProvider, Generic[TToken_co]):
         self._unauthorized_page_url_path: Final = "/auth/unauthorized"
         self.unauthorized_route_name: Final = "unauthorized"
 
+        self._public_key_resolver = CachedResolver(
+            Partial(self._keycloak_openid.a_public_key),
+            lock=asyncio.Lock(),
+            cache_ttl=self._config.public_key_cache_ttl,
+        )
+
     @property
     def not_login_required_routes(self) -> list[str]:
         items = super().not_login_required_routes
@@ -68,6 +77,19 @@ class KeycloakAuthProvider(BaseAuthProvider, Generic[TToken_co]):
     def routes_for_redirect_to_index(self) -> list[str]:
         items = super().routes_for_redirect_to_index
         return [self.unauthorized_route_name, *items]
+
+    async def get_keycloak_public_key(self) -> jwk.JWK:
+        public_key = await self._public_key_resolver()
+        key = f"-----BEGIN PUBLIC KEY-----\n{public_key}\n-----END PUBLIC KEY-----"
+        return jwk.JWK.from_pem(key.encode("utf-8"))
+
+    async def decode_token(self, raw_access_token: str) -> TToken_co:
+        public_key = await self.get_keycloak_public_key()
+        access_token = await self._keycloak_openid.a_decode_token(
+            raw_access_token,
+            key=public_key,
+        )
+        return self._config.token_parser(access_token)
 
     def get_depends_middlewares(self, admin_app: "AdminApp") -> Sequence[Middleware]:
         return [
