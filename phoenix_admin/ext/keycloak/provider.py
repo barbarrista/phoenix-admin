@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Sequence
-from http import HTTPMethod
+from http import HTTPMethod, HTTPStatus
 from typing import TYPE_CHECKING, Final, Generic
 
 from jwcrypto import jwk
@@ -17,6 +17,7 @@ from phoenix_admin.ext.keycloak.dto import (
     KeycloakConfig,
 )
 from phoenix_admin.ext.keycloak.middleware import RefreshTokenMiddleware
+from phoenix_admin.ext.keycloak.state import AuthStateManager
 from phoenix_admin.ext.keycloak.types import TToken_co
 from phoenix_admin.state import get_app_state
 from phoenix_admin.utils import (
@@ -41,6 +42,7 @@ class KeycloakAuthProvider(BaseAuthProvider, Generic[TToken_co]):
         self,
         keycloak_openid: KeycloakOpenID,
         config: KeycloakConfig[TToken_co],
+        auth_state_manager: AuthStateManager,
         sign_in_path: str = "/sign-in",
         sign_out_path: str = "/sign-out",
     ) -> None:
@@ -56,6 +58,8 @@ class KeycloakAuthProvider(BaseAuthProvider, Generic[TToken_co]):
 
         self._unauthorized_page_url_path: Final = "/auth/unauthorized"
         self.unauthorized_route_name: Final = "unauthorized"
+
+        self._auth_state_manager: Final = auth_state_manager
 
         self._public_key_resolver = CachedResolver(
             Partial(self._keycloak_openid.a_public_key),
@@ -103,16 +107,16 @@ class KeycloakAuthProvider(BaseAuthProvider, Generic[TToken_co]):
 
     async def get_sign_in_response(self, request: Request) -> Response:
         state = get_app_state(request)
-        redirect_url = (
-            get_first_query_param_item(request, param="next")
-            or state.admin_app.base_url
-        )
+        next_url = get_first_query_param_item(request, param="next")
+        if next_url is None:
+            return Response(status_code=HTTPStatus.BAD_REQUEST)
+
         refresh_token = request.cookies.get(self._config.cookie_names.refresh)
         if refresh_token is not None:
             tokens = await self._keycloak_openid.a_refresh_token(
                 refresh_token=refresh_token,
             )
-            response = RedirectResponse(redirect_url)
+            response = RedirectResponse(next_url)
             set_tokens_to_cookie(
                 response,
                 tokens=tokens,
@@ -125,29 +129,48 @@ class KeycloakAuthProvider(BaseAuthProvider, Generic[TToken_co]):
             base_url=str(request.base_url).removesuffix("/"),
             admin_path=state.admin_app.base_url,
             url_path=self._auth_callback_path,
-            redirect_url=redirect_url,
         )
+
+        auth_state = self._auth_state_manager.create(next_url=next_url)
         auth_url = await self._keycloak_openid.a_auth_url(
             redirect_uri=callback_url.build(),
             scope=self._config.scope,
+            state=auth_state.state,
         )
-        return RedirectResponse(auth_url)
+        response = RedirectResponse(auth_url)
+        response.set_cookie(
+            key=self._config.cookie_names.csrf,
+            value=auth_state.csrf_token,
+            max_age=int(self._auth_state_manager.state_ttl.total_seconds()),
+            httponly=True,
+            secure=True,
+        )
+        return response
 
     async def get_auth_callback_response(self, request: Request) -> Response:
         state = get_app_state(request)
         code = get_first_query_param_item(request, param="code")
-        if code is None:
-            return RedirectResponse(self._auth_failed_url_path)
+        auth_failed_response = RedirectResponse(self._auth_failed_url_path)
+        csrf_cookie_name = self._config.cookie_names.csrf
+        csrf_token = request.cookies.pop(csrf_cookie_name, None)
+        raw_auth_state = get_first_query_param_item(request, param="state")
 
-        redirect_url = get_first_query_param_item(request, param="next")
-        if redirect_url is None:
-            return RedirectResponse(self._auth_failed_url_path)
+        if code is None or csrf_token is None or raw_auth_state is None:
+            auth_failed_response.delete_cookie(csrf_cookie_name)
+            return auth_failed_response
+
+        result = self._auth_state_manager.verify(
+            state=raw_auth_state,
+            csrf_token=csrf_token,
+        )
+        if not result.is_valid:
+            auth_failed_response.delete_cookie(csrf_cookie_name)
+            return auth_failed_response
 
         callback_url = CallbackUrl(
             base_url=str(request.base_url).removesuffix("/"),
             admin_path=state.admin_app.base_url,
             url_path=self._auth_callback_path,
-            redirect_url=redirect_url,
         )
 
         raw_tokens = await self._keycloak_openid.a_token(
@@ -156,13 +179,15 @@ class KeycloakAuthProvider(BaseAuthProvider, Generic[TToken_co]):
             grant_type=self._config.grant_type,
         )
 
-        response = RedirectResponse(redirect_url)
+        response = RedirectResponse(result.state.next_url)
         set_tokens_to_cookie(
             response,
             tokens=raw_tokens,
             token_names=self._config.cookie_names,
             path=state.admin_app.base_url,
         )
+        response.delete_cookie(csrf_cookie_name)
+
         return response
 
     async def get_auth_failed_response(self, request: Request) -> Response:  # noqa: ARG002

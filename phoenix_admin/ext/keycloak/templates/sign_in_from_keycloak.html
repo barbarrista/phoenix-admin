@@ -35,7 +35,7 @@
       <div class="card">
         <div class="card-body p-4">
           <div class="mb-3">
-              <a href="{{ url_for(__admin_route_name__ ~ ':sign_in') }}" class="btn btn-primary w-100"><i class="ti ti-login me-2"></i>Sign In with Keycloak</a>
+              <a href="{{ url_for(__admin_route_name__ ~ ':sign_in') }}?next={{ url_for(__admin_route_name__ ~ ':index') }}" class="btn btn-primary w-100"><i class="ti ti-login me-2"></i>Sign In with Keycloak</a>
           </div>
         </div>
       </div>
