@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from http import HTTPMethod, HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, TypeVar
 
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 _TResponse = TypeVar("_TResponse", bound=Response)
 
 
-def _create_endpoint_handler(
+def create_endpoint_handler(
     endpoint: Callable[..., Awaitable[Response]],
     **kwargs: Any,  # noqa: ANN401,
 ) -> Callable[[Request], Awaitable[Response]]:
@@ -36,14 +36,14 @@ def _create_endpoint_handler(
 class BaseAuthProvider(ABC):
     def __init__(
         self,
-        login_path: str = "/login",
-        logout_path: str = "/logout",
+        sign_in_path: str = "/sign-in",
+        sign_out_path: str = "/sign-out",
     ) -> None:
-        self._sign_in_path: Final = login_path
-        self.sign_in_route_name: Final = "login"
+        self._sign_in_path: Final = sign_in_path
+        self.sign_in_route_name: Final = "sign_in"
 
-        self._sign_out_path: Final = logout_path
-        self.sign_out_route_name: Final = "logout"
+        self._sign_out_path: Final = sign_out_path
+        self.sign_out_route_name: Final = "sign_out"
 
         self._default_context: Final[Mapping[str, Any]] = {"is_auth_case": True}
 
@@ -51,16 +51,59 @@ class BaseAuthProvider(ABC):
     def not_login_required_routes(self) -> list[str]:
         return [self.sign_in_route_name, self.sign_out_route_name, STATICS_ROUTE_NAME]
 
+    @property
+    def routes_for_redirect_to_index(self) -> list[str]:
+        return [self.sign_in_route_name]
+
+    @abstractmethod
+    async def get_sign_in_response(self, request: Request) -> Response:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_sign_out_response(self, request: Request) -> Response:
+        raise NotImplementedError
+
     @abstractmethod
     async def authenticate(self, request: Request) -> AuthenticationResult:
         raise NotImplementedError
 
+    def _get_sign_in_route(self) -> Route:
+        return Route(
+            self._sign_in_path,
+            create_endpoint_handler(self.get_sign_in_response),
+            methods=[HTTPMethod.GET, HTTPMethod.POST],
+            name=self.sign_in_route_name,
+        )
+
+    def _get_sign_out_route(self) -> Route:
+        return Route(
+            self._sign_out_path,
+            create_endpoint_handler(self.get_sign_out_response),
+            methods=[HTTPMethod.GET, HTTPMethod.POST],
+            name=self.sign_out_route_name,
+        )
+
+    def add_routes_to_app(self, admin_app: "AdminApp") -> None:
+        admin_app.asgi_app.routes.extend(
+            (
+                self._get_sign_in_route(),
+                self._get_sign_out_route(),
+            )
+        )
+
+    def get_depends_middlewares(self, admin_app: "AdminApp") -> Sequence[Middleware]:  # noqa: ARG002
+        return [Middleware(AuthMiddleware, provider=self)]
+
+
+class FormAuthProvider(BaseAuthProvider):
+    @abstractmethod
     async def sign_in(self, form_data: AuthData, *, request: Request) -> None:
         raise NotImplementedError
 
     async def after_sign_in(self, request: Request, response: _TResponse) -> _TResponse:  # noqa: ARG002
         return response
 
+    @abstractmethod
     async def sign_out(self, request: Request) -> None:
         raise NotImplementedError
 
@@ -71,7 +114,7 @@ class BaseAuthProvider(ABC):
     ) -> _TResponse:
         return response
 
-    async def render_sign_in(self, request: Request) -> Response:
+    async def get_sign_in_response(self, request: Request) -> Response:
         state = get_app_state(request)
         template_name = "sign_in.html"
         if request.method == HTTPMethod.GET:
@@ -115,7 +158,7 @@ class BaseAuthProvider(ABC):
         response = await self.after_sign_in(request=request, response=response)
         return response  # noqa: RET504
 
-    async def render_sign_out(self, request: Request) -> Response:
+    async def get_sign_out_response(self, request: Request) -> Response:
         state = get_app_state(request)
         response = RedirectResponse(
             request.url_for(state.admin_route_name + f":{INDEX_ROUTE_NAME}"),
@@ -124,33 +167,6 @@ class BaseAuthProvider(ABC):
         await self.sign_out(request)
         response = await self.after_sign_out(request=request, response=response)
         return response  # noqa: RET504
-
-    def _get_sign_in_route(self) -> Route:
-        return Route(
-            self._sign_in_path,
-            _create_endpoint_handler(self.render_sign_in),
-            methods=[HTTPMethod.GET, HTTPMethod.POST],
-            name=self.sign_in_route_name,
-        )
-
-    def _get_sign_out_route(self) -> Route:
-        return Route(
-            self._sign_out_path,
-            _create_endpoint_handler(self.render_sign_out),
-            methods=[HTTPMethod.GET, HTTPMethod.POST],
-            name=self.sign_out_route_name,
-        )
-
-    def add_routes_to_app(self, admin_app: "AdminApp") -> None:
-        admin_app.asgi_app.routes.extend(
-            (
-                self._get_sign_in_route(),
-                self._get_sign_out_route(),
-            )
-        )
-
-    def get_auth_middleware(self, admin_app: "AdminApp") -> Middleware:  # noqa: ARG002
-        return Middleware(AuthMiddleware, provider=self)
 
     async def _get_form_data(self, request: Request) -> AuthData:
         return AuthData.model_validate(await request.form())

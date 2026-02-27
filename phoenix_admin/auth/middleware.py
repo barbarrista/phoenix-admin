@@ -60,7 +60,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if target_route.name in self._provider.not_login_required_routes:
-            if target_route.name == self._provider.sign_in_route_name:
+            if target_route.name in self._provider.routes_for_redirect_to_index:
                 auth_result = await self._provider.authenticate(request)
                 if auth_result.is_authenticated:
                     request = _set_user_to_scope(
