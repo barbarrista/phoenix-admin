@@ -100,14 +100,15 @@ def create_admin_app() -> AdminApp:
     config = KeycloakConfig[DecodedAccessToken](
         token_parser=DecodedAccessToken.model_validate,
     )
-    key = "secret"
+    app_key = "secret app_key"
+    keycloak_key = "secret keycloak_key"
     admin = AdminApp(
         auth_provider=KcAuthProvider(
             keycloak_openid=keycloak_openid,
             config=config,
-            auth_state_manager=AuthStateManager(secret_key=key),
+            auth_state_manager=AuthStateManager(secret_key=keycloak_key),
         ),
-        middlewares=[Middleware(SessionMiddleware, secret_key=key)],
+        middlewares=[Middleware(SessionMiddleware, secret_key=app_key)],
     )
     admin.add_view(RegisterView())
 
