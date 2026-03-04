@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
-from _logger import logger
+from phoenix_admin._logger import logger
 from phoenix_admin.state import get_app_state
 from phoenix_admin.utils import set_tokens_to_cookie, set_tokens_to_state
 

@@ -33,7 +33,7 @@
 - [x] Authentication middleware
 - [x] Authorization providers
 - [ ] Permission system
-- [ ] Keycloak auth
+- [x] Keycloak auth
 - [ ] CSRF Token
 
 ### Support hooks
