@@ -8,6 +8,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from phoenix_admin.ext.keycloak.dto import TokenCookieNames
+from phoenix_admin.request_action import RequestAction
 
 _T = TypeVar("_T")
 
@@ -193,3 +194,18 @@ def get_tokens_from_request(request: Request, token_name: str) -> str | None:
         return from_cookie
 
     return _get_tokens_from_state(request, token_name=token_name)
+
+
+_REQUEST_ACTION_FIELD = "__request_action__"
+
+
+def set_request_action(request: Request, *, action: RequestAction) -> None:
+    setattr(
+        request.state,
+        _REQUEST_ACTION_FIELD,
+        action,
+    )
+
+
+def get_request_action(request: Request) -> RequestAction:
+    return cast("RequestAction", getattr(request.state, _REQUEST_ACTION_FIELD))
