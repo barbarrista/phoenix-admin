@@ -1,31 +1,54 @@
+from collections.abc import Sequence
 from http import HTTPMethod, HTTPStatus
-from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
+from typing import Annotated, Any, ClassVar, Generic, TypeVar
 
 import jinja2
+from sqlalchemy import Select, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.sql.functions import count
 from starlette.datastructures import Headers
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 from starlette.templating import Jinja2Templates
+from typing_extensions import Doc
 
+from phoenix_admin.config import ModelViewConfig
+from phoenix_admin.ext.sqla.dto import PaginationParamsDTO
+from phoenix_admin.ext.sqla.utils import get_db_session
 from phoenix_admin.request_action import RequestAction
-from phoenix_admin.utils import get_request_action, qualname
+from phoenix_admin.utils import cast_int, get_request_action, getval, qualname
 from phoenix_admin.views.base import BaseView
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import DeclarativeBase
-
-_TModel = TypeVar("_TModel", bound="DeclarativeBase")
+_TModel = TypeVar("_TModel", bound=DeclarativeBase)
 
 
 class SqlalchemyModelView(BaseView, Generic[_TModel]):
     __orm_model__: type[_TModel]
+    __config__: ModelViewConfig | None = None
 
     identity: ClassVar[str]
-    title: str = "ModelView"
-    list_template: str = "list.html"
-    detail_template: str = "detail.html"
-    create_template: str = "create.html"
-    update_template: str = "update.html"
+
+    list_template: Annotated[
+        str,
+        Doc("HTML template path for list page"),
+    ] = "list.html"
+    detail_template: Annotated[
+        str,
+        Doc("HTML template path for detail page"),
+    ] = "detail.html"
+    create_template: Annotated[
+        str,
+        Doc("HTML template path for create page"),
+    ] = "create.html"
+    update_template: Annotated[
+        str,
+        Doc("HTML template path for update page"),
+    ] = "update.html"
+
+    @property
+    def config(self) -> ModelViewConfig:
+        return getval(self.__config__)
 
     def __class_getitem__(cls, item: type[_TModel]) -> "SqlalchemyModelView[_TModel]":
         cls_name = f"ModelView[{qualname(item)}]"
@@ -34,6 +57,60 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
             (cls,),
             {"__orm_model__": item},
         )  # type: ignore[return-value]
+
+    async def get_list(
+        self,
+        base_stmt: Select[tuple[_TModel]],
+        *,
+        session: AsyncSession,
+        dto: PaginationParamsDTO,
+    ) -> Sequence[_TModel]:
+        base_stmt = await self._apply_pagination(base_stmt, dto=dto)
+        return (await session.scalars(base_stmt)).all()
+
+    async def get_count(
+        self,
+        stmt: Select[tuple[_TModel]],
+        session: AsyncSession,
+    ) -> int:
+        count_stmt = select(count()).select_from(stmt.subquery())
+        return await session.scalar(count_stmt) or 0
+
+    async def get_list_stmt(self) -> Select[tuple[_TModel]]:
+        return select(self.__orm_model__)
+
+    async def _apply_pagination(
+        self,
+        base_stmt: Select[tuple[_TModel]],
+        *,
+        dto: PaginationParamsDTO,
+    ) -> Select[tuple[_TModel]]:
+        limit = dto.limit or self.config.page_limit
+        offset = dto.offset or 0
+        return base_stmt.limit(limit).offset(offset)
+
+    async def handle_api_request(self, request: Request) -> JSONResponse:
+        limit = request.query_params.get("limit")
+        offset = request.query_params.get("offset")
+        dto = PaginationParamsDTO(limit=cast_int(limit), offset=cast_int(offset))
+        session = get_db_session(request)
+
+        stmt = await self.get_list_stmt()
+        total = await self.get_count(stmt, session=session)
+
+        result = await self.get_list(stmt, dto=dto, session=session)
+        data = await self.map_to_json(result)
+
+        return JSONResponse(
+            content={
+                "results": data,
+                "count": total,
+            }
+        )
+
+    async def map_to_json(self, data: Sequence[_TModel]) -> Any:
+        # TODO: impl normal mapper
+        return [(item.id) for item in data]
 
     async def handle(self, request: Request, templates: Jinja2Templates) -> Response:
         action = get_request_action(request)
@@ -76,8 +153,9 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
         rendered_template = template.render(
             request=request,
             view=self,
-            title=self.title,
+            title=self.config.title,
             ident=ident,
+            table_columns=["id", "name"],
         )
         if request.method == HTTPMethod.GET:
             return Response(

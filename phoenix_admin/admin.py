@@ -22,6 +22,9 @@ from phoenix_admin.constants import (
 )
 from phoenix_admin.exceptions import PhoenixAdminError
 from phoenix_admin.ext.sqla.view import SqlalchemyModelView
+from phoenix_admin.extensions.extension import OnRequestExtension
+from phoenix_admin.extensions.manager import ExtensionManager
+from phoenix_admin.extensions.middleware import ExtensionMiddleware
 from phoenix_admin.fields.base import StructField
 from phoenix_admin.protocols import HasMount
 from phoenix_admin.request_action import RequestAction
@@ -46,6 +49,7 @@ class AdminApp:
         debug: bool = False,
         middlewares: list[Middleware] | None = None,
         auth_provider: BaseAuthProvider | None = None,
+        extensions: list[OnRequestExtension] | None = None,
     ) -> None:
         self._asgi_app: Final = app or Starlette(debug=debug)
         self._views: list[BaseView] = []
@@ -62,6 +66,8 @@ class AdminApp:
         self._setup_static_routes()
         self._setup_routes()
 
+        self._extension_manager = ExtensionManager(extensions)
+
         self._setup_asgi_app()
         self._setup_auth(auth_provider)
 
@@ -69,6 +75,7 @@ class AdminApp:
         self._extend_asgi_app_middlewares()
 
     def _extend_asgi_app_middlewares(self) -> None:
+        self._asgi_app.user_middleware.append(Middleware(ExtensionMiddleware))
         self._asgi_app.user_middleware.extend(self.middlewares)
 
     def _setup_asgi_app(self) -> None:
@@ -76,6 +83,7 @@ class AdminApp:
             self.asgi_app.state,
             admin_app=self,
             admin_route_name=self.route_name,
+            extension_manager=self._extension_manager,
         )
 
     def _setup_auth(
@@ -120,16 +128,24 @@ class AdminApp:
         ).decode()
 
         self.templates.env.filters["is_dropdown"] = lambda view: isinstance(
-            view, DropDown
+            view,
+            DropDown,
         )
         self.templates.env.filters["is_form_view"] = lambda view: isinstance(
-            view, BaseFormView
+            view,
+            BaseFormView,
         )
         self.templates.env.filters["is_link_view"] = lambda view: isinstance(
-            view, LinkView
+            view,
+            LinkView,
+        )
+        self.templates.env.filters["is_model_view"] = lambda view: isinstance(
+            view,
+            SqlalchemyModelView,
         )
         self.templates.env.filters["is_struct_field"] = lambda field: isinstance(
-            field, StructField
+            field,
+            StructField,
         )
         self.templates.env.filters["is_user_authenticated"] = (
             lambda request: USER_SCOPE_KEY in request.scope
@@ -166,10 +182,16 @@ class AdminApp:
             methods=[HTTPMethod.GET, HTTPMethod.POST],
             name=StaticRoute.update,
         )
+        self._asgi_app.add_route(
+            path="/api/{identity}",
+            route=self._handle_api_view(action=RequestAction.api),
+            methods=[HTTPMethod.GET, HTTPMethod.POST],
+            name=StaticRoute.api,
+        )
 
     def add_view(
         self,
-        view: View | DropDown | LinkView | SqlalchemyModelView,
+        view: View | DropDown | LinkView | SqlalchemyModelView[Any],
         *,
         can_append_in_list: bool = True,
         view_name: str | None = None,
@@ -230,14 +252,37 @@ class AdminApp:
 
         return wrapper
 
+    def _handle_api_view(
+        self,
+        action: RequestAction,
+    ) -> Callable[[Request], Awaitable[Response]]:
+        async def wrapper(request: Request) -> Response:
+            identity = request.path_params["identity"]
+            view = self._model_views.get(identity)
+            if view is None:
+                detail = f'ModelView by identity "{identity}" doesn\'t found'
+                raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail=detail)
+
+            set_request_action(request=request, action=action)
+            return await view.handle_api_request(request)
+
+        return wrapper
+
     def mount_to(self, app: HasMount) -> None:
         app.mount(path=self.base_url, app=self._asgi_app, name=self.route_name)
 
-    def _validate_view(
+    def _validate_view(  # noqa: C901
         self,
-        view: View | DropDown | LinkView | SqlalchemyModelView,
+        view: View | DropDown | LinkView | SqlalchemyModelView[Any],
     ) -> None:
-        if isinstance(view, LinkView | SqlalchemyModelView):
+        if isinstance(view, LinkView):
+            return
+
+        if isinstance(view, SqlalchemyModelView):
+            if view.__config__ is None:
+                msg = 'Define the "__config__" field in your view.'
+                raise ValueError(msg)
+
             return
 
         if isinstance(view, DropDown):
@@ -249,7 +294,7 @@ class AdminApp:
             return
 
         if view.__config__ is None:
-            msg = 'Define the "__config__" parameter in your view.\nThis can be done either through a declarative definition in the class itself or through the config parameter when initializing the view.'
+            msg = 'Define the "__config__" field in your view.\nThis can be done either through a declarative definition in the class itself or through the config parameter when initializing the view.'
             raise ValueError(msg)
 
         if (path := view.config.path) in self._view_paths:

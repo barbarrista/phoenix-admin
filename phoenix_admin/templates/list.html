@@ -1,11 +1,38 @@
-{% extends "base.html" %}
-
-{% block content %}
+{% extends "base.html" %} {% block content %}
 <div class="page-wrapper w-100 d-flex">
-    <div class="mx-auto w-50">
-        <div class="text-center">
-            <h1 class="mb-3">List</h1>
-        </div>
+  <div class="mx-auto w-50">
+    <div class="text-center">
+      <h1 class="mb-3">List</h1>
     </div>
+    <div id="table-wrapper"></div>
+  </div>
 </div>
+
+<link
+  href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css"
+  rel="stylesheet"
+/>
+<script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+
+<script>
+  let url = "{{ url_for(__admin_route_name__~ ':api', identity=view.identity) }}"
+  let columns = {{ table_columns|safe }}
+  new gridjs.Grid({
+    columns: columns,
+    server: {
+      url: url,
+      then: data => data.results,
+      total: data => data.count
+    },
+    pagination: {
+      enabled: true,
+      limit: {{ view.config.page_limit}},
+      server: {
+        url: (prev, page, limit) => `${prev}?limit=${limit}&offset=${page * limit}`
+      },
+    },
+    sort: true,
+    search: true
+  }).render(document.getElementById("table-wrapper"));
+</script>
 {% endblock %}

@@ -6,6 +6,7 @@ from starlette.requests import Request
 
 if TYPE_CHECKING:
     from phoenix_admin.admin import AdminApp
+    from phoenix_admin.extensions.manager import ExtensionManager
 
 
 class AppState:
@@ -15,6 +16,7 @@ class AppState:
         *,
         admin_app: "AdminApp",
         admin_route_name: str,
+        extension_manager: "ExtensionManager",
     ) -> None:
         self._state = state
 
@@ -22,6 +24,7 @@ class AppState:
             ("admin_app", admin_app),
             ("asgi_app", admin_app.asgi_app),
             ("admin_route_name", admin_route_name),
+            ("extension_manager", extension_manager),
         ):
             if key not in self._state._state:  # noqa: SLF001
                 setattr(self._state, key, value)
@@ -37,6 +40,10 @@ class AppState:
     @property
     def admin_app(self) -> "AdminApp":
         return cast("AdminApp", self._state.admin_app)
+
+    @property
+    def extension_manager(self) -> "ExtensionManager":
+        return cast("ExtensionManager", self._state.extension_manager)
 
 
 def get_app_state(request: Request) -> AppState:

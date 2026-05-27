@@ -1,3 +1,4 @@
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from inspect import isclass
 from typing import Any, TypeVar, cast
@@ -209,3 +210,13 @@ def set_request_action(request: Request, *, action: RequestAction) -> None:
 
 def get_request_action(request: Request) -> RequestAction:
     return cast("RequestAction", getattr(request.state, _REQUEST_ACTION_FIELD))
+
+
+def cast_int(value: str | None) -> int | None:
+    if value is None:
+        return None
+
+    with suppress(ValueError):
+        return int(value)
+
+    return None

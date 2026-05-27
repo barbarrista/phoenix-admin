@@ -1,6 +1,7 @@
 {% import "macros/dropdown_view.html" as dropdown with context %}
 {% import "macros/form_view.html" as form_view with context %}
 {% import "macros/link_view.html" as link_view with context %}
+{% import "macros/model_view.html" as model_view with context %}
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="light">
   <head>
@@ -57,6 +58,10 @@
                   {{ form_view.macro(view) }}
                 {% endif %}
                 
+                {% if (view | is_model_view) %}
+                  {{ model_view.macro(view) }}
+                {% endif %}
+
                 {% if (view | is_link_view) %}
                   {{ link_view.macro(view) }}
                 {% endif %}
