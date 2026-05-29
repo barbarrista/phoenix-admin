@@ -12,7 +12,7 @@ from phoenix_admin.auth.exceptions import AuthenticationError
 from phoenix_admin.auth.provider import FormAuthProvider
 from phoenix_admin.config import ViewConfig
 from phoenix_admin.exceptions import FormValidationError
-from phoenix_admin.fields.base import PasswordField, TextField
+from phoenix_admin.fields.fields import PasswordField, TextField
 from phoenix_admin.views.form import BaseFormView, RequestContext
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from starlette.applications import Starlette

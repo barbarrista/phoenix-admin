@@ -15,7 +15,9 @@ from typing_extensions import Doc
 
 from phoenix_admin.config import ModelViewConfig
 from phoenix_admin.ext.sqla.dto import PaginationParamsDTO
+from phoenix_admin.ext.sqla.mapper import SqlalchemyMapper
 from phoenix_admin.ext.sqla.utils import get_db_session
+from phoenix_admin.fields.fields import BaseField
 from phoenix_admin.request_action import RequestAction
 from phoenix_admin.utils import cast_int, get_request_action, getval, qualname
 from phoenix_admin.views.base import BaseView
@@ -25,8 +27,10 @@ _TModel = TypeVar("_TModel", bound=DeclarativeBase)
 
 class SqlalchemyModelView(BaseView, Generic[_TModel]):
     __orm_model__: type[_TModel]
-    __config__: ModelViewConfig | None = None
+    __config__: ClassVar[ModelViewConfig | None] = None
+    __mapper__: ClassVar[SqlalchemyMapper] = SqlalchemyMapper()
 
+    fields: Sequence[BaseField]
     identity: ClassVar[str]
 
     list_template: Annotated[
@@ -108,9 +112,13 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
             }
         )
 
-    async def map_to_json(self, data: Sequence[_TModel]) -> Any:
-        # TODO: impl normal mapper
-        return [(item.id) for item in data]
+    async def map_to_json(self, data: Sequence[_TModel]) -> Sequence[Any]:
+        return [
+            list(
+                (await self.__mapper__.to_json(model=item, fields=self.fields)).values()
+            )
+            for item in data
+        ]
 
     async def handle(self, request: Request, templates: Jinja2Templates) -> Response:
         action = get_request_action(request)
@@ -150,12 +158,13 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
         template: jinja2.Template,
     ) -> Response:
         ident = request.path_params.get("ident")
+        table_columns = [item.label for item in self.fields]
         rendered_template = template.render(
             request=request,
             view=self,
             title=self.config.title,
             ident=ident,
-            table_columns=["id", "name"],
+            table_columns=table_columns,
         )
         if request.method == HTTPMethod.GET:
             return Response(

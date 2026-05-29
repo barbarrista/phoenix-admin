@@ -12,7 +12,7 @@ from phoenix_admin.config import ViewConfig
 from phoenix_admin.ext.keycloak.dto import KeycloakConfig
 from phoenix_admin.ext.keycloak.provider import KeycloakAuthProvider
 from phoenix_admin.ext.keycloak.state import AuthStateManager
-from phoenix_admin.fields.base import PasswordField, TextField
+from phoenix_admin.fields.fields import PasswordField, TextField
 from phoenix_admin.utils import get_tokens_from_request
 from phoenix_admin.views.form import BaseFormView, RequestContext
 from pydantic import BaseModel, ConfigDict, Field, SecretStr

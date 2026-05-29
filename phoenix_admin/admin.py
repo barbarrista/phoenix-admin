@@ -22,10 +22,10 @@ from phoenix_admin.constants import (
 )
 from phoenix_admin.exceptions import PhoenixAdminError
 from phoenix_admin.ext.sqla.view import SqlalchemyModelView
-from phoenix_admin.extensions.extension import OnRequestExtension
+from phoenix_admin.extensions.extension import BaseExtension
 from phoenix_admin.extensions.manager import ExtensionManager
 from phoenix_admin.extensions.middleware import ExtensionMiddleware
-from phoenix_admin.fields.base import StructField
+from phoenix_admin.fields.fields import StructField
 from phoenix_admin.protocols import HasMount
 from phoenix_admin.request_action import RequestAction
 from phoenix_admin.state import AppState
@@ -49,7 +49,7 @@ class AdminApp:
         debug: bool = False,
         middlewares: list[Middleware] | None = None,
         auth_provider: BaseAuthProvider | None = None,
-        extensions: list[OnRequestExtension] | None = None,
+        extensions: list[BaseExtension] | None = None,
     ) -> None:
         self._asgi_app: Final = app or Starlette(debug=debug)
         self._views: list[BaseView] = []
@@ -66,7 +66,7 @@ class AdminApp:
         self._setup_static_routes()
         self._setup_routes()
 
-        self._extension_manager = ExtensionManager(extensions)
+        self._extension_manager = ExtensionManager(extensions=extensions)
 
         self._setup_asgi_app()
         self._setup_auth(auth_provider)

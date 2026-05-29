@@ -20,7 +20,7 @@ from starlette.responses import Response
 from starlette.templating import Jinja2Templates
 
 from phoenix_admin.exceptions import FormValidationError
-from phoenix_admin.fields.base import BaseField, ListField, StructField
+from phoenix_admin.fields.fields import BaseField, ListField, StructField
 from phoenix_admin.responses import AsJsonResponse
 from phoenix_admin.utils import getval, qualname, remove_empty_values, transform_to_dict
 from phoenix_admin.views.base import View
