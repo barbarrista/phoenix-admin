@@ -18,14 +18,15 @@ class NoneValueError(Exception):
     """Raised when None is passed to getval(value) or await agetval(value)`"""
 
 
-def getval(value: _T | None) -> _T:
+def getval(value: _T | None, exc: BaseException | None = None) -> _T:
     """
     Returns value if value is not None\n
     Raised:
         - `NoneValueError`
     """
     if value is None:
-        raise NoneValueError
+        current_ext = exc or NoneValueError
+        raise current_ext
 
     return value
 

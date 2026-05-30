@@ -3,9 +3,10 @@ from collections.abc import Sequence
 from datetime import UTC, date
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, TypeAlias, TypeVar
 
 from phoenix_admin.fields.exceptions import ParseError, try_cast
+from phoenix_admin.utils import getval
 
 MapStrategy: TypeAlias = Literal["name_as_value", "value"]
 
@@ -101,6 +102,7 @@ class EnumFieldMapper(BaseFieldMapper):
         if is_optional and value is None:
             return None
 
+        value = getval(value, exc=ParseError("Got unexpected None value"))
         if self._map_strategy == "name_as_value":
             return value.name
 
@@ -129,10 +131,11 @@ class CheckboxFieldMapper(BaseFieldMapper):
             return None
         return str(value).lower()
 
-    def from_json(self, value: str, *, is_optional: bool = False) -> bool | None:
+    def from_json(self, value: str | None, *, is_optional: bool = False) -> bool | None:
         if is_optional and value is None:
             return None
 
+        value = _getval(value)
         if value == "true":
             return True
 
@@ -160,14 +163,18 @@ class ListFieldMapper(BaseFieldMapper):
         if is_optional and value is None:
             return None
 
-        return [self._child_mapper.to_json(item) for item in value]
+        return [self._child_mapper.to_json(item) for item in _getval(value)]
 
     def from_json(
-        self, value: Sequence[Any], *, is_optional: bool = False
-    ) -> Sequence[Any]:
+        self,
+        value: Sequence[Any] | None,
+        *,
+        is_optional: bool = False,
+    ) -> Sequence[Any] | None:
         if is_optional and value is None:
             return None
 
+        value = _getval(value)
         return [self._child_mapper.from_json(item) for item in value]
 
 
@@ -182,6 +189,7 @@ class DateFieldMapper(BaseFieldMapper):
         if is_optional and value is None:
             return None
 
+        value = _getval(value)
         if self._dump_format is not None:
             try:
                 return value.strftime(self._dump_format)
@@ -212,10 +220,16 @@ class DateTimeMapper(BaseFieldMapper):
     ) -> None:
         self._dump_format = dump_format
 
-    def to_json(self, value: date, *, is_optional: bool = False) -> str | None:
+    def to_json(
+        self,
+        value: datetime.datetime | None,
+        *,
+        is_optional: bool = False,
+    ) -> str | None:
         if is_optional and value is None:
             return None
 
+        value = _getval(value)
         if self._dump_format is not None:
             try:
                 return value.strftime(self._dump_format)
@@ -233,7 +247,15 @@ class DateTimeMapper(BaseFieldMapper):
         if is_optional and value is None:
             return None
 
+        value = _getval(value)
         try:
-            return datetime.datetime.fromisoformat(value).replace(tzinfo=UTC)  # type:ignore[arg-type]
+            return datetime.datetime.fromisoformat(value).replace(tzinfo=UTC)
         except (ValueError, TypeError) as exc:
             raise ParseError from exc
+
+
+_T = TypeVar("_T")
+
+
+def _getval(value: _T | None) -> _T:
+    return getval(value, exc=ParseError("Got unexpected None value"))
