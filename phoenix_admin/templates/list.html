@@ -9,14 +9,24 @@
 </div>
 
 <link
-  href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css"
+  href="https://cdnjs.cloudflare.com/ajax/libs/gridjs/6.2.0/theme/mermaid.min.css"
   rel="stylesheet"
 />
-<script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gridjs/6.2.0/gridjs.umd.js"></script>
 
 <script>
   let url = "{{ url_for(__admin_route_name__~ ':api', identity=view.identity) }}"
-  let columns = {{ table_columns|safe }}
+  let rawColumns = {{ table_columns|safe }}
+  let columns = rawColumns.map((item) => {
+    return {
+      id: item.id,
+      name: item.name,
+      width: item.width,
+      sort: item.sort,
+      hidden: item.hidden,
+      formatter: (cell) => gridjs.html(cell)
+    }
+  });
   new gridjs.Grid({
     columns: columns,
     server: {

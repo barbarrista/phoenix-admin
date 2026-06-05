@@ -1,11 +1,11 @@
 from collections.abc import Sequence
 from http import HTTPMethod, HTTPStatus
-from typing import Annotated, Any, ClassVar, Generic, TypeVar
+from typing import Annotated, Any, ClassVar, Generic, Literal, TypeAlias, TypeVar
 
 import jinja2
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute
 from sqlalchemy.sql.functions import count
 from starlette.datastructures import Headers
 from starlette.requests import Request
@@ -15,13 +15,28 @@ from typing_extensions import Doc
 
 from phoenix_admin.config import ModelViewConfig
 from phoenix_admin.ext.sqla.dto import PaginationParamsDTO
+from phoenix_admin.ext.sqla.fields import RelationshipField
 from phoenix_admin.ext.sqla.mapper import SqlalchemyMapper
-from phoenix_admin.ext.sqla.utils import get_db_session
+from phoenix_admin.ext.sqla.pk import Pk
+from phoenix_admin.ext.sqla.utils import (
+    get_db_session,
+    get_default_load_strategy,
+    get_field_name,
+)
 from phoenix_admin.fields.fields import BaseField
 from phoenix_admin.request_action import RequestAction
+from phoenix_admin.state import get_app_state
+from phoenix_admin.table import TableColumnProps, TableColumnPropsList
 from phoenix_admin.utils import cast_int, get_request_action, getval, qualname
 from phoenix_admin.views.base import BaseView
 
+PkFields: TypeAlias = (
+    list[str]
+    | tuple[str, ...]
+    | Sequence[InstrumentedAttribute[Any]]
+    | str
+    | InstrumentedAttribute[Any]
+)
 _TModel = TypeVar("_TModel", bound=DeclarativeBase)
 
 
@@ -30,8 +45,19 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
     __config__: ClassVar[ModelViewConfig | None] = None
     __mapper__: ClassVar[SqlalchemyMapper] = SqlalchemyMapper()
 
-    fields: Sequence[BaseField]
-    identity: ClassVar[str]
+    fields: ClassVar[
+        Annotated[
+            Sequence[BaseField],
+            Doc("Fields that will appear on the list, view, and edit page"),
+        ]
+    ]
+    identity: ClassVar[
+        Annotated[
+            str,
+            Doc("The view ID by which the view class can be found"),
+        ]
+    ]
+    pk_field: Annotated[Pk, Doc("Primary key field/fields")]
 
     list_template: Annotated[
         str,
@@ -83,6 +109,30 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
     async def get_list_stmt(self) -> Select[tuple[_TModel]]:
         return select(self.__orm_model__)
 
+    async def _apply_load_strategies(
+        self,
+        base_stmt: Select[tuple[_TModel]],
+    ) -> Select[tuple[_TModel]]:
+        relationship_fields = [
+            item for item in self.fields if isinstance(item, RelationshipField)
+        ]
+        if not relationship_fields:
+            return base_stmt
+
+        for field in relationship_fields:
+            model_field = getattr(
+                self.__orm_model__,
+                get_field_name(getval(field.source_field)),
+            )
+
+            load_strategy = get_default_load_strategy(model_field)
+            if field.load_strategy:
+                load_strategy = field.load_strategy()
+
+            base_stmt = base_stmt.options(load_strategy)
+
+        return base_stmt
+
     async def _apply_pagination(
         self,
         base_stmt: Select[tuple[_TModel]],
@@ -100,10 +150,11 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
         session = get_db_session(request)
 
         stmt = await self.get_list_stmt()
+        stmt = await self._apply_load_strategies(base_stmt=stmt)
         total = await self.get_count(stmt, session=session)
 
         result = await self.get_list(stmt, dto=dto, session=session)
-        data = await self.map_to_json(result)
+        data = await self.map_to_json(result, request=request)
 
         return JSONResponse(
             content={
@@ -112,13 +163,21 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
             }
         )
 
-    async def map_to_json(self, data: Sequence[_TModel]) -> Sequence[Any]:
-        return [
-            list(
-                (await self.__mapper__.to_json(model=item, fields=self.fields)).values()
+    async def map_to_json(
+        self,
+        data: Sequence[_TModel],
+        request: Request,
+    ) -> Sequence[Any]:
+        state = get_app_state(request)
+        mapped_entities = [
+            await self.__mapper__.to_json(
+                model=item,
+                fields=self.fields,
+                model_view_registry=state.model_view_registry,
             )
             for item in data
         ]
+        return [list((item).values()) for item in mapped_entities]
 
     async def handle(self, request: Request, templates: Jinja2Templates) -> Response:
         action = get_request_action(request)
@@ -158,13 +217,13 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
         template: jinja2.Template,
     ) -> Response:
         ident = request.path_params.get("ident")
-        table_columns = [item.label for item in self.fields]
+        table_columns = await self._get_table_columns(request)
         rendered_template = template.render(
             request=request,
             view=self,
             title=self.config.title,
             ident=ident,
-            table_columns=table_columns,
+            table_columns=table_columns.model_dump_json(),
         )
         if request.method == HTTPMethod.GET:
             return Response(
@@ -176,6 +235,25 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
             raise NotImplementedError
         else:
             raise NotImplementedError
+
+    async def _get_table_columns(self, request: Request) -> TableColumnPropsList:  # noqa: ARG002
+        return TableColumnPropsList(
+            [
+                TableColumnProps(
+                    id=item.column_props.id or item.name or item.source_field_name,
+                    name=(
+                        item.column_props.name
+                        or item.label
+                        or item.name
+                        or item.source_field_name
+                    ),
+                    width=item.column_props.width,
+                    sort=item.column_props.sort,
+                    hidden=item.column_props.hidden,
+                )
+                for item in self.fields
+            ]
+        )
 
     def _get_template(
         self,
@@ -198,3 +276,11 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
             case _ as unexpected:
                 msg = f"Got unexpected {qualname(RequestAction)}: {unexpected}"
                 raise ValueError(msg)
+
+    async def repr_model(
+        self,
+        request: Request | None,  # noqa: ARG002
+        model: _TModel,
+        request_type: Literal["list", "field_access"],  # noqa: ARG002
+    ) -> str:
+        return repr(model)

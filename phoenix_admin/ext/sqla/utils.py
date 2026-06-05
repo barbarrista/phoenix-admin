@@ -1,6 +1,8 @@
-from typing import cast
+from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute, joinedload
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 from starlette.requests import Request
 
 from phoenix_admin.ext.sqla.extension import SqlalchemyAsyncSessionExtension
@@ -16,3 +18,14 @@ def get_db_session(request: Request) -> AsyncSession:
         raise ValueError(msg)
 
     return cast("AsyncSession", session)
+
+
+def get_field_name(field: str | InstrumentedAttribute[Any]) -> str:
+    if isinstance(field, str):
+        return field
+
+    return field.key
+
+
+def get_default_load_strategy(field: InstrumentedAttribute[Any]) -> _AbstractLoad:
+    return joinedload(field)

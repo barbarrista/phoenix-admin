@@ -12,3 +12,6 @@ class StaticRoute(SimpleNamespace):
     create = "create"
     update = "update"
     api = "api"
+
+
+PK_FIELD: Final = "__PK__"

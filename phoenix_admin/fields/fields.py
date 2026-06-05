@@ -6,9 +6,10 @@ from typing import Any, Generic, Literal, TypeAlias, TypeVar
 from pydantic import BaseModel
 from sqlalchemy.orm import InstrumentedAttribute
 
+from phoenix_admin.ext.sqla.utils import get_field_name
 from phoenix_admin.fields.mappers import (
     BaseFieldMapper,
-    CheckboxFieldMapper,
+    BooleanFieldMapper,
     DateFieldMapper,
     DateTimeMapper,
     DecimalFieldMapper,
@@ -24,6 +25,7 @@ from phoenix_admin.fields.mappers import (
     TextFieldMapper,
 )
 from phoenix_admin.not_set import NOT_SET
+from phoenix_admin.table import TableColumnProps
 
 FieldTypes: TypeAlias = Literal[
     "text",
@@ -40,6 +42,7 @@ FieldTypes: TypeAlias = Literal[
     "date",
     "datetime",
     "struct",
+    "relationship",
 ]
 
 
@@ -56,12 +59,12 @@ class BaseField:
     required: bool = False
     placeholder: str | None = None
     help_text: str | None = None
-    error: str | None = None
     readonly: bool = False
     form_template = "form_fields/input.html"
     grid_item_template = "datagrid/default_item.html"
     multiple: bool = False
     mapper: BaseFieldMapper | None = field(default_factory=BaseFieldMapper)
+    column_props: TableColumnProps = field(default_factory=TableColumnProps)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -73,6 +76,13 @@ class BaseField:
     @name.setter
     def name(self, value: str) -> None:
         self._name = value
+
+    @property
+    def source_field_name(self) -> str | None:
+        if self.source_field is None:
+            return None
+
+        return get_field_name(self.source_field)
 
     def get_name_with_index(self, index: int) -> str:
         return f"{self._name}.{index}"
@@ -166,11 +176,11 @@ class TextAreaField(BaseField):
 
 
 @dataclass(kw_only=True)
-class CheckboxField(BaseField):
+class BooleanField(BaseField):
     field_type: Literal["checkbox"] = field(default="checkbox", init=False)
     disabled: bool = False
     form_template = "form_fields/checkbox.html"
-    mapper: CheckboxFieldMapper | None = field(default_factory=CheckboxFieldMapper)
+    mapper: BooleanFieldMapper | None = field(default_factory=BooleanFieldMapper)
 
 
 @dataclass(kw_only=True)

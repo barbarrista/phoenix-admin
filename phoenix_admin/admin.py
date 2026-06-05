@@ -53,7 +53,7 @@ class AdminApp:
     ) -> None:
         self._asgi_app: Final = app or Starlette(debug=debug)
         self._views: list[BaseView] = []
-        self._model_views: dict[str, SqlalchemyModelView[Any]] = {}
+        self._model_view_registry: dict[str, SqlalchemyModelView[Any]] = {}
         self._view_paths: list[str] = []
         self._title: Final = title
 
@@ -84,6 +84,7 @@ class AdminApp:
             admin_app=self,
             admin_route_name=self.route_name,
             extension_manager=self._extension_manager,
+            model_view_registry=self._model_view_registry,
         )
 
     def _setup_auth(
@@ -207,7 +208,7 @@ class AdminApp:
             return
 
         if isinstance(view, SqlalchemyModelView):
-            self._model_views[view.identity] = view
+            self._model_view_registry[view.identity] = view
             return
 
         if isinstance(view, BaseFormView | View):
@@ -242,7 +243,7 @@ class AdminApp:
     ) -> Callable[[Request], Awaitable[Response]]:
         async def wrapper(request: Request) -> Response:
             identity = request.path_params["identity"]
-            view = self._model_views.get(identity)
+            view = self._model_view_registry.get(identity)
             if view is None:
                 detail = f'ModelView by identity "{identity}" doesn\'t found'
                 raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail=detail)
@@ -258,7 +259,7 @@ class AdminApp:
     ) -> Callable[[Request], Awaitable[Response]]:
         async def wrapper(request: Request) -> Response:
             identity = request.path_params["identity"]
-            view = self._model_views.get(identity)
+            view = self._model_view_registry.get(identity)
             if view is None:
                 detail = f'ModelView by identity "{identity}" doesn\'t found'
                 raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail=detail)
@@ -279,9 +280,10 @@ class AdminApp:
             return
 
         if isinstance(view, SqlalchemyModelView):
-            if view.__config__ is None:
-                msg = 'Define the "__config__" field in your view.'
-                raise ValueError(msg)
+            for field_name in ("__config__", "identity", "pk_field"):
+                if not hasattr(view, field_name) or getattr(view, field_name) is None:
+                    msg = f'Define the "{field_name}" in {qualname(view)} view'
+                    raise ValueError(msg)
 
             return
 

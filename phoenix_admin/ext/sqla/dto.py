@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -17,3 +18,14 @@ class ApiResponseSchema(pydantic.BaseModel):
 class PaginationParamsDTO:
     limit: int | None = None
     offset: int | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RelationshipMember:
+    represented_name: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class MappedEntity:
+    pk: str
+    dumped_fields: Mapping[str, Any]
