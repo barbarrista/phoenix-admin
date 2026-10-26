@@ -1,8 +1,13 @@
 from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import InstrumentedAttribute, joinedload
-from sqlalchemy.orm.strategy_options import _AbstractLoad
+from sqlalchemy.orm import (
+    InstrumentedAttribute,
+    Load,
+    RelationshipProperty,
+    joinedload,
+    selectinload,
+)
 from starlette.requests import Request
 
 from phoenix_admin.ext.sqla.extension import SqlalchemyAsyncSessionExtension
@@ -27,5 +32,16 @@ def get_field_name(field: str | InstrumentedAttribute[Any]) -> str:
     return field.key
 
 
-def get_default_load_strategy(field: InstrumentedAttribute[Any]) -> _AbstractLoad:
-    return joinedload(field)
+def get_default_load_strategy(field: InstrumentedAttribute[Any]) -> Load:
+    prop = field.property
+    if not isinstance(prop, RelationshipProperty):
+        msg = (
+            f"{field} is not a relationship. "
+            "RelationshipField.source_field must point at a relationship attribute."
+        )
+        raise TypeError(msg)
+
+    if prop.uselist is True:
+        return cast("Load", selectinload(field))
+
+    return cast("Load", joinedload(field))

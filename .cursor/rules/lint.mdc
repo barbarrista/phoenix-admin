@@ -1,0 +1,13 @@
+---
+description: Run task lint after writing or editing code and fix what it reports
+alwaysApply: true
+---
+
+# Lint after code changes
+
+After you write or edit code in this repo, run `task lint` before you finish. It runs Ruff check with fixes, Ruff format, and mypy on `phoenix_admin` and `tests`.
+
+- Run it once the code changes are in place, not after every keystroke.
+- If it reports an error, fix the code and run `task lint` again.
+- Leave the tree lint-clean. Do not finish while `task lint` is failing.
+- Skip it when the turn did not change code.

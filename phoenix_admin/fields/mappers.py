@@ -14,6 +14,9 @@ from typing import (
     Unpack,
 )
 
+from markupsafe import escape
+from starlette.requests import Request
+
 from phoenix_admin.fields.exceptions import ParseError, try_cast
 from phoenix_admin.utils import getval
 
@@ -36,6 +39,7 @@ class BaseFieldMapper:
         value: Any,  # noqa: ANN401
         *,
         is_optional: bool = False,
+        request: Request,
         **kwargs: Unpack[FieldMapperKwargs],
     ) -> Any:  # noqa: ANN401
         raise NotImplementedError
@@ -51,7 +55,7 @@ class BaseFieldMapper:
         if value is None:
             return "-"
 
-        return str(value)
+        return str(escape(value))
 
     @staticmethod
     def _getval(value: _T | None) -> _T:
@@ -64,6 +68,7 @@ class TextFieldMapper(BaseFieldMapper):
         value: Any,  # noqa: ANN401
         *,
         is_optional: bool = False,
+        request: Request,  # noqa: ARG002
         **kwargs: Unpack[FieldMapperKwargs],  # noqa: ARG002
     ) -> str | None:
         if is_optional and value is None:
@@ -89,7 +94,8 @@ class EmailFieldMapper(TextFieldMapper):
         if value is None:
             return "-"
 
-        return f"<a href='mailto:{value}'>{value}</a>"
+        safe_value = escape(value)
+        return f"<a href='mailto:{safe_value}'>{safe_value}</a>"
 
 
 class PasswordFieldMapper(TextFieldMapper):
@@ -102,6 +108,7 @@ class FloatFieldMapper(BaseFieldMapper):
         value: float | None,
         *,
         is_optional: bool = False,
+        request: Request,  # noqa: ARG002
         **kwargs: Unpack[FieldMapperKwargs],  # noqa: ARG002
     ) -> float | None:
         if is_optional and value is None:
@@ -123,6 +130,7 @@ class IntegerFieldMapper(BaseFieldMapper):
         value: int | None,
         *,
         is_optional: bool = False,
+        request: Request,  # noqa: ARG002
         **kwargs: Unpack[FieldMapperKwargs],  # noqa: ARG002
     ) -> int | None:
         if is_optional and value is None:
@@ -144,6 +152,7 @@ class DecimalFieldMapper(BaseFieldMapper):
         value: Decimal | None,
         *,
         is_optional: bool = False,
+        request: Request,  # noqa: ARG002
         **kwargs: Unpack[FieldMapperKwargs],  # noqa: ARG002
     ) -> str | None:
         if is_optional and value is None:
@@ -184,6 +193,7 @@ class EnumFieldMapper(BaseFieldMapper):
         value: Enum | None,
         *,
         is_optional: bool = False,
+        request: Request,  # noqa: ARG002
         **kwargs: Unpack[FieldMapperKwargs],  # noqa: ARG002
     ) -> Any:  # noqa: ANN401
         if is_optional and value is None:
@@ -225,6 +235,7 @@ class BooleanFieldMapper(BaseFieldMapper):
         value: bool | None,  # noqa: FBT001
         *,
         is_optional: bool = False,
+        request: Request,  # noqa: ARG002
         **kwargs: Unpack[FieldMapperKwargs],  # noqa: ARG002
     ) -> str | None:
         if is_optional and value is None:
@@ -273,12 +284,16 @@ class ListFieldMapper(BaseFieldMapper):
         value: Sequence[Any] | None,
         *,
         is_optional: bool = False,
+        request: Request,
         **kwargs: Unpack[FieldMapperKwargs],  # noqa: ARG002
     ) -> Sequence[Any] | None:
         if is_optional and value is None:
             return None
 
-        return [self._child_mapper.to_json(item) for item in self._getval(value)]
+        return [
+            await self._child_mapper.to_json(item, request=request)
+            for item in self._getval(value)
+        ]
 
     async def from_json(
         self,
@@ -290,7 +305,17 @@ class ListFieldMapper(BaseFieldMapper):
             return None
 
         value = self._getval(value)
-        return [self._child_mapper.from_json(item) for item in value]
+        return [await self._child_mapper.from_json(item) for item in value]
+
+    def to_html(
+        self,
+        value: Any,  # noqa: ANN401
+        **kwargs: Unpack[FieldMapperKwargs],  # noqa: ARG002
+    ) -> str:
+        if value is None:
+            return "-"
+
+        return ", ".join(str(escape(item)) for item in value)
 
 
 class DateFieldMapper(BaseFieldMapper):
@@ -305,6 +330,7 @@ class DateFieldMapper(BaseFieldMapper):
         value: date | None,
         *,
         is_optional: bool = False,
+        request: Request,  # noqa: ARG002
         **kwargs: Unpack[FieldMapperKwargs],  # noqa: ARG002
     ) -> str | None:
         if is_optional and value is None:
@@ -347,6 +373,7 @@ class DateTimeMapper(BaseFieldMapper):
         value: datetime.datetime | None,
         *,
         is_optional: bool = False,
+        request: Request,  # noqa: ARG002
         **kwargs: Unpack[FieldMapperKwargs],  # noqa: ARG002
     ) -> str | None:
         if is_optional and value is None:

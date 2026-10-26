@@ -3,6 +3,7 @@ from http import HTTPMethod, HTTPStatus
 from typing import Annotated, Any, ClassVar, Generic, Literal, TypeVar
 
 import jinja2
+from markupsafe import escape
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
@@ -31,6 +32,16 @@ from phoenix_admin.utils import cast_int, get_request_action, getval, qualname
 from phoenix_admin.views.base import BaseView
 
 _TModel = TypeVar("_TModel", bound=DeclarativeBase)
+
+
+def _cell_html(field: BaseField, value: Any) -> str:  # noqa: ANN401
+    if field.mapper is None:
+        if value is None:
+            return "-"
+
+        return str(escape(value))
+
+    return field.mapper.to_html(value)
 
 
 class InvalidPaginationError(Exception):
@@ -211,15 +222,21 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
         request: Request,
     ) -> Sequence[Any]:
         state = get_app_state(request)
-        mapped_entities = [
-            await self.__mapper__.to_json(
+        rows: list[list[str]] = []
+        for item in data:
+            mapped = await self.__mapper__.to_json(
                 model=item,
                 fields=self.fields,
                 model_view_registry=state.model_view_registry,
+                request=request,
             )
-            for item in data
-        ]
-        return [list((item).values()) for item in mapped_entities]
+            rows.append(
+                [
+                    _cell_html(field, value)
+                    for field, value in zip(self.fields, mapped.values(), strict=True)
+                ]
+            )
+        return rows
 
     async def handle(self, request: Request, templates: Jinja2Templates) -> Response:
         action = get_request_action(request)
@@ -321,7 +338,7 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
 
     async def repr_model(
         self,
-        request: Request | None,  # noqa: ARG002
+        request: Request,  # noqa: ARG002
         model: _TModel,
         request_type: Literal["list", "field_access"],  # noqa: ARG002
     ) -> str:

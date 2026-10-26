@@ -2,6 +2,7 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Final
 
 from sqlalchemy.orm import DeclarativeBase
+from starlette.requests import Request
 
 from phoenix_admin.ext.sqla.fields import RelationshipField
 from phoenix_admin.ext.sqla.mappers import RelationshipMapper
@@ -21,6 +22,7 @@ class SqlalchemyMapper:
         model: DeclarativeBase,
         fields: Sequence[BaseField],
         model_view_registry: Mapping[str, "SqlalchemyModelView[Any]"],
+        request: Request,
     ) -> dict[str, Any]:
         attribute_msg = "Attribute %s doesn't found from model %s"
         mapping: dict[str, Any] = {}
@@ -36,10 +38,10 @@ class SqlalchemyMapper:
             if not hasattr(model, field_name):
                 raise AttributeError(attribute_msg.format(field.source_field, model))
 
-            if field.mapper is None:
-                continue
-
             value = getattr(model, field_name)
+            if field.mapper is None:
+                mapping[field_name] = value
+                continue
             if isinstance(field, RelationshipField) and isinstance(
                 field.mapper,
                 RelationshipMapper,
@@ -53,14 +55,16 @@ class SqlalchemyMapper:
                     value,
                     is_optional=field.required is False,  # noqa: FIX002, TD003, TD002 # TODO: switch to check None in model field annotation
                     model_view=model_view,
+                    request=request,
                 )
             else:
                 mapped_value = await field.mapper.to_json(
                     value,
                     is_optional=field.required is False,  # noqa: FIX002, TD003, TD002 # TODO: switch to check None in model field annotation
+                    request=request,
                 )
 
-            mapping[field_name] = field.mapper.to_html(mapped_value)
+            mapping[field_name] = mapped_value
 
         return mapping
 

@@ -1,20 +1,20 @@
-import asyncio
 import json
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from http import HTTPStatus
 from types import SimpleNamespace
 from typing import cast
 
 import pytest
+import pytest_asyncio
 from phoenix_admin.config import ModelViewConfig
 from phoenix_admin.ext.sqla.dto import PaginationParamsDTO
 from phoenix_admin.ext.sqla.pk import Pk
 from phoenix_admin.ext.sqla.view import SqlalchemyModelView
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from starlette.requests import Request
 from starlette.types import Scope
+from tests.ext.sqla.session import open_session
 
 
 class Base(DeclarativeBase):
@@ -36,17 +36,6 @@ class ItemView(SqlalchemyModelView[Item]):
 
 def test_max_page_limit_defaults_to_100() -> None:
     assert ModelViewConfig().max_page_limit == 100  # noqa: PLR2004
-
-
-@asynccontextmanager
-async def open_session() -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with session_factory() as session:
-        yield session
-    await engine.dispose()
 
 
 async def seed_items(session: AsyncSession) -> list[Item]:
@@ -77,91 +66,54 @@ def ids_of(rows: list[Item]) -> list[str]:
     return [row.id for row in rows]
 
 
-async def missing_limit_uses_page_limit() -> None:
-    async with open_session() as session:
-        items = await seed_items(session)
-        view = ItemView()
-        ordered = sorted(item.id for item in items)
-        stmt = await view.get_list_stmt()
-
-        page = list(
-            await view.get_list(
-                stmt,
-                session=session,
-                dto=PaginationParamsDTO(),
-            )
-        )
-        response = await view.handle_api_request(api_request("", session))
-        body = json.loads(bytes(response.body))
-
-        assert ids_of(page) == ordered[: view.config.page_limit]
-        assert response.status_code == HTTPStatus.OK
-        assert len(body["results"]) == view.config.page_limit
-        assert body["count"] == len(items)
+@pytest_asyncio.fixture
+async def session() -> AsyncIterator[AsyncSession]:
+    async with open_session(Base) as session:
+        yield session
 
 
-async def non_numeric_limit_uses_page_limit() -> None:
-    async with open_session() as session:
-        items = await seed_items(session)
-        view = ItemView()
-        response = await view.handle_api_request(api_request("limit=abc", session))
-        body = json.loads(bytes(response.body))
-
-        assert response.status_code == HTTPStatus.OK
-        assert len(body["results"]) == view.config.page_limit
-        assert body["count"] == len(items)
+@pytest_asyncio.fixture
+async def items(session: AsyncSession) -> list[Item]:
+    return await seed_items(session)
 
 
-async def rejected_pagination(query: str) -> tuple[int, str]:
+@pytest.mark.asyncio
+async def test_missing_limit_uses_page_limit(
+    session: AsyncSession,
+    items: list[Item],
+) -> None:
     view = ItemView()
-    response = await view.handle_api_request(api_request(query))
+    ordered = sorted(item.id for item in items)
+    stmt = await view.get_list_stmt()
+
+    page = list(
+        await view.get_list(
+            stmt,
+            session=session,
+            dto=PaginationParamsDTO(),
+        )
+    )
+    response = await view.handle_api_request(api_request("", session))
     body = json.loads(bytes(response.body))
-    detail = body["detail"]
-    assert isinstance(detail, str)
-    return response.status_code, detail
+
+    assert ids_of(page) == ordered[: view.config.page_limit]
+    assert response.status_code == HTTPStatus.OK
+    assert len(body["results"]) == view.config.page_limit
+    assert body["count"] == len(items)
 
 
-async def requested_limit_is_capped() -> None:
-    async with open_session() as session:
-        items = await seed_items(session)
-        view = ItemView()
-        ordered = sorted(item.id for item in items)
-        stmt = await view.get_list_stmt()
-        above_max = view.config.max_page_limit + 1
+@pytest.mark.asyncio
+async def test_non_numeric_limit_uses_page_limit(
+    session: AsyncSession,
+    items: list[Item],
+) -> None:
+    view = ItemView()
+    response = await view.handle_api_request(api_request("limit=abc", session))
+    body = json.loads(bytes(response.body))
 
-        capped = list(
-            await view.get_list(
-                stmt,
-                session=session,
-                dto=PaginationParamsDTO(limit=above_max),
-            )
-        )
-        response = await view.handle_api_request(
-            api_request(f"limit={above_max}", session),
-        )
-        body = json.loads(bytes(response.body))
-        single = list(
-            await view.get_list(
-                stmt,
-                session=session,
-                dto=PaginationParamsDTO(limit=1),
-            )
-        )
-
-        assert len(items) > view.config.max_page_limit
-        assert ids_of(capped) == ordered[: view.config.max_page_limit]
-        assert response.status_code == HTTPStatus.OK
-        assert len(body["results"]) == view.config.max_page_limit
-        assert body["count"] == len(items)
-        assert ids_of(single) == ordered[:1]
-
-
-def test_missing_limit_uses_page_limit() -> None:
-    asyncio.run(missing_limit_uses_page_limit())
-
-
-def test_non_numeric_limit_uses_page_limit() -> None:
-    asyncio.run(non_numeric_limit_uses_page_limit())
+    assert response.status_code == HTTPStatus.OK
+    assert len(body["results"]) == view.config.page_limit
+    assert body["count"] == len(items)
 
 
 @pytest.mark.parametrize(
@@ -172,12 +124,50 @@ def test_non_numeric_limit_uses_page_limit() -> None:
         ("offset=-1", "offset"),
     ],
 )
-def test_out_of_range_pagination_returns_400(query: str, mentioned: str) -> None:
-    status_code, detail = asyncio.run(rejected_pagination(query))
+@pytest.mark.asyncio
+async def test_out_of_range_pagination_returns_400(query: str, mentioned: str) -> None:
+    view = ItemView()
+    response = await view.handle_api_request(api_request(query))
+    body = json.loads(bytes(response.body))
+    detail = body["detail"]
 
-    assert status_code == HTTPStatus.BAD_REQUEST
+    assert isinstance(detail, str)
+    assert response.status_code == HTTPStatus.BAD_REQUEST
     assert mentioned in detail
 
 
-def test_requested_limit_is_capped() -> None:
-    asyncio.run(requested_limit_is_capped())
+@pytest.mark.asyncio
+async def test_requested_limit_is_capped(
+    session: AsyncSession,
+    items: list[Item],
+) -> None:
+    view = ItemView()
+    ordered = sorted(item.id for item in items)
+    stmt = await view.get_list_stmt()
+    above_max = view.config.max_page_limit + 1
+
+    capped = list(
+        await view.get_list(
+            stmt,
+            session=session,
+            dto=PaginationParamsDTO(limit=above_max),
+        )
+    )
+    response = await view.handle_api_request(
+        api_request(f"limit={above_max}", session),
+    )
+    body = json.loads(bytes(response.body))
+    single = list(
+        await view.get_list(
+            stmt,
+            session=session,
+            dto=PaginationParamsDTO(limit=1),
+        )
+    )
+
+    assert len(items) > view.config.max_page_limit
+    assert ids_of(capped) == ordered[: view.config.max_page_limit]
+    assert response.status_code == HTTPStatus.OK
+    assert len(body["results"]) == view.config.max_page_limit
+    assert body["count"] == len(items)
+    assert ids_of(single) == ordered[:1]

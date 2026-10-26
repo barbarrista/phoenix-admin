@@ -66,6 +66,7 @@ lint = [
 tests = [
     "aiosqlite>=0.22.1",
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.2",
 ]
 
 [tool.ruff]

@@ -1,13 +1,13 @@
-import asyncio
 from collections.abc import AsyncIterator, Sequence
-from contextlib import asynccontextmanager
 
+import pytest
+import pytest_asyncio
 from phoenix_admin.config import ModelViewConfig
 from phoenix_admin.ext.sqla.dto import PaginationParamsDTO
 from phoenix_admin.ext.sqla.pk import Pk
 from phoenix_admin.ext.sqla.view import SqlalchemyModelView
 from sqlalchemy import ForeignKey, Select, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -15,6 +15,7 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
+from tests.ext.sqla.session import open_session
 
 
 class Base(DeclarativeBase):
@@ -91,17 +92,6 @@ class LoadedParentView(SqlalchemyModelView[Parent]):
         return select(Parent).options(joinedload(Parent.children))
 
 
-@asynccontextmanager
-async def open_session() -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with session_factory() as session:
-        yield session
-    await engine.dispose()
-
-
 async def seed_items(session: AsyncSession) -> list[Item]:
     items = [
         Item(id="c", name="z"),
@@ -113,151 +103,169 @@ async def seed_items(session: AsyncSession) -> list[Item]:
     return items
 
 
+async def seed_joined_parents(session: AsyncSession) -> tuple[Parent, ...]:
+    parent_a = Parent(id=1)
+    parent_b = Parent(id=2)
+    with_children = (parent_a, parent_b)
+    session.add_all(
+        [
+            *with_children,
+            Parent(id=3),
+            Child(id=1, parent=parent_a),
+            Child(id=2, parent=parent_a),
+            Child(id=3, parent=parent_b),
+        ]
+    )
+    await session.flush()
+    return with_children
+
+
+async def seed_visible_items(session: AsyncSession) -> list[Item]:
+    items = [
+        Item(id="a", name="visible"),
+        Item(id="b", name="hidden"),
+        Item(id="c", name="visible"),
+    ]
+    session.add_all(items)
+    await session.flush()
+    return items
+
+
+async def seed_parent_with_children(session: AsyncSession) -> Parent:
+    parent = Parent(id=1)
+    session.add_all([parent, Child(id=1, parent=parent), Child(id=2, parent=parent)])
+    await session.flush()
+    return parent
+
+
 def ids_of(rows: Sequence[Item]) -> list[str]:
     return [row.id for row in rows]
 
 
-async def pages_cover_every_row_once() -> None:
-    async with open_session() as session:
-        await seed_items(session)
-        view = ItemView()
-        stmt = await view.get_list_stmt()
-        page_limit = view.config.page_limit
-
-        first = await view.get_list(
-            stmt,
-            session=session,
-            dto=PaginationParamsDTO(offset=0),
-        )
-        second = await view.get_list(
-            stmt,
-            session=session,
-            dto=PaginationParamsDTO(offset=page_limit),
-        )
-
-        assert ids_of(first) == ["a", "b"]
-        assert ids_of(second) == ["c"]
-        assert await view.get_count(stmt, session) == len(
-            ids_of(first) + ids_of(second)
-        )
+@pytest_asyncio.fixture
+async def session() -> AsyncIterator[AsyncSession]:
+    async with open_session(Base) as session:
+        yield session
 
 
-async def first_page_repeats_in_the_same_order() -> None:
-    async with open_session() as session:
-        await seed_items(session)
-        view = ItemView()
-        stmt = await view.get_list_stmt()
-        dto = PaginationParamsDTO(offset=0)
-
-        first = await view.get_list(stmt, session=session, dto=dto)
-        again = await view.get_list(stmt, session=session, dto=dto)
-
-        assert ids_of(again) == ids_of(first) == ["a", "b"]
+@pytest_asyncio.fixture
+async def items(session: AsyncSession) -> list[Item]:
+    return await seed_items(session)
 
 
-async def explicit_order_by_is_kept() -> None:
-    async with open_session() as session:
-        await seed_items(session)
-        view = NameOrderedItemView()
-        stmt = await view.get_list_stmt()
-
-        page = await view.get_list(
-            stmt,
-            session=session,
-            dto=PaginationParamsDTO(offset=0),
-        )
-
-        assert ids_of(page) == ["c", "b"]
+@pytest_asyncio.fixture
+async def parents_with_children(session: AsyncSession) -> tuple[Parent, ...]:
+    return await seed_joined_parents(session)
 
 
-async def count_is_parents_not_join_pairs() -> None:
-    async with open_session() as session:
-        parent_a = Parent(id=1)
-        parent_b = Parent(id=2)
-        parent_without_children = Parent(id=3)
-        parents_with_children = [parent_a, parent_b]
-        session.add_all(
-            [
-                *parents_with_children,
-                parent_without_children,
-                Child(id=1, parent=parent_a),
-                Child(id=2, parent=parent_a),
-                Child(id=3, parent=parent_b),
-            ]
-        )
-        await session.flush()
-
-        view = JoinedParentView()
-        stmt = await view.get_list_stmt()
-
-        assert await view.get_count(stmt, session) == len(parents_with_children)
+@pytest_asyncio.fixture
+async def visible_items(session: AsyncSession) -> list[Item]:
+    return await seed_visible_items(session)
 
 
-async def count_ignores_limit_offset_and_order() -> None:
-    async with open_session() as session:
-        items = await seed_items(session)
-        view = LimitedItemView()
-        stmt = await view.get_list_stmt()
-
-        assert await view.get_count(stmt, session) == len(items)
+@pytest_asyncio.fixture
+async def parent_with_children(session: AsyncSession) -> Parent:
+    return await seed_parent_with_children(session)
 
 
-async def count_keeps_where_clause() -> None:
-    async with open_session() as session:
-        items = [
-            Item(id="a", name="visible"),
-            Item(id="b", name="hidden"),
-            Item(id="c", name="visible"),
-        ]
-        session.add_all(items)
-        await session.flush()
-        view = FilteredItemView()
-        stmt = await view.get_list_stmt()
-        visible = [item for item in items if item.name != "hidden"]
+@pytest.mark.asyncio
+async def test_pages_cover_every_row_once(
+    session: AsyncSession,
+    items: list[Item],
+) -> None:
+    view = ItemView()
+    stmt = await view.get_list_stmt()
+    page_limit = view.config.page_limit
+    ordered = sorted(item.id for item in items)
 
-        assert await view.get_count(stmt, session) == len(visible)
+    first = await view.get_list(
+        stmt,
+        session=session,
+        dto=PaginationParamsDTO(offset=0),
+    )
+    second = await view.get_list(
+        stmt,
+        session=session,
+        dto=PaginationParamsDTO(offset=page_limit),
+    )
 
-
-async def count_ignores_loader_options() -> None:
-    async with open_session() as session:
-        parent = Parent(id=1)
-        session.add_all(
-            [
-                parent,
-                Child(id=1, parent=parent),
-                Child(id=2, parent=parent),
-            ]
-        )
-        await session.flush()
-        view = LoadedParentView()
-        stmt = await view.get_list_stmt()
-
-        assert await view.get_count(stmt, session) == 1
+    assert ids_of(first) == ordered[:page_limit]
+    assert ids_of(second) == ordered[page_limit:]
+    assert await view.get_count(stmt, session) == len(items)
 
 
-def test_pages_cover_every_row_once() -> None:
-    asyncio.run(pages_cover_every_row_once())
+@pytest.mark.asyncio
+async def test_first_page_repeats_in_the_same_order(
+    session: AsyncSession,
+    items: list[Item],
+) -> None:
+    view = ItemView()
+    stmt = await view.get_list_stmt()
+    dto = PaginationParamsDTO(offset=0)
+    ordered = sorted(item.id for item in items)
+
+    first = await view.get_list(stmt, session=session, dto=dto)
+    again = await view.get_list(stmt, session=session, dto=dto)
+
+    assert ids_of(again) == ids_of(first) == ordered[: view.config.page_limit]
 
 
-def test_first_page_repeats_in_the_same_order() -> None:
-    asyncio.run(first_page_repeats_in_the_same_order())
+@pytest.mark.asyncio
+async def test_explicit_order_by_is_kept(
+    session: AsyncSession,
+    items: list[Item],
+) -> None:
+    view = NameOrderedItemView()
+    stmt = await view.get_list_stmt()
+    ordered = sorted(items, key=lambda item: item.name, reverse=True)
+
+    page = await view.get_list(
+        stmt,
+        session=session,
+        dto=PaginationParamsDTO(offset=0),
+    )
+
+    assert ids_of(page) == [item.id for item in ordered[: view.config.page_limit]]
 
 
-def test_explicit_order_by_is_kept() -> None:
-    asyncio.run(explicit_order_by_is_kept())
+@pytest.mark.asyncio
+async def test_count_is_parents_not_join_pairs(
+    session: AsyncSession,
+    parents_with_children: tuple[Parent, ...],
+) -> None:
+    view = JoinedParentView()
+    stmt = await view.get_list_stmt()
+
+    assert await view.get_count(stmt, session) == len(parents_with_children)
 
 
-def test_count_is_parents_not_join_pairs() -> None:
-    asyncio.run(count_is_parents_not_join_pairs())
+@pytest.mark.asyncio
+async def test_count_ignores_limit_offset_and_order(
+    session: AsyncSession,
+    items: list[Item],
+) -> None:
+    view = LimitedItemView()
+    stmt = await view.get_list_stmt()
+
+    assert await view.get_count(stmt, session) == len(items)
 
 
-def test_count_ignores_limit_offset_and_order() -> None:
-    asyncio.run(count_ignores_limit_offset_and_order())
+@pytest.mark.asyncio
+async def test_count_keeps_where_clause(
+    session: AsyncSession,
+    visible_items: list[Item],
+) -> None:
+    view = FilteredItemView()
+    stmt = await view.get_list_stmt()
+    visible = [item for item in visible_items if item.name != "hidden"]
+
+    assert await view.get_count(stmt, session) == len(visible)
 
 
-def test_count_keeps_where_clause() -> None:
-    asyncio.run(count_keeps_where_clause())
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("parent_with_children")
+async def test_count_ignores_loader_options(session: AsyncSession) -> None:
+    view = LoadedParentView()
+    stmt = await view.get_list_stmt()
 
-
-def test_count_ignores_loader_options() -> None:
-    asyncio.run(count_ignores_loader_options())
+    assert await view.get_count(stmt, session) == 1

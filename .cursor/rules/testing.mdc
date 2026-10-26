@@ -1,0 +1,32 @@
+---
+description: Write branch-complete pytest tests and reuse fixtures when a second test needs the same setup
+globs: tests/**/*.py
+alwaysApply: false
+---
+
+# Tests
+
+Cover every branch of the code under test: the success path, each error and early return, and the boundary values (empty, `None`, zero, one, many). Assert the outcome that distinguishes that branch.
+
+- One behavior per test. Name the test after the branch it locks in.
+- Reuse setup. Look for an existing fixture or helper before writing a new one. Put shared setup in a fixture in the nearest `conftest.py`, or in a shared test module such as `tests/ext/sqla/session.py`, once a second test needs it.
+- Keep a fixture in one module until another module needs it, then move it up.
+- Leave one-off setup inline. A fixture that only a single test uses is extra machinery.
+- Mock only real boundaries (I/O, time, external services). Do not mock away the branches under test.
+
+```python
+@pytest.fixture
+def user(session: AsyncSession) -> User:
+    row = User(name="Ada")
+    session.add(row)
+    return row
+
+
+def test_get_user_returns_row(session: AsyncSession, user: User) -> None:
+    assert get_user(session, user.id) == user
+
+
+def test_get_user_raises_when_missing(session: AsyncSession) -> None:
+    with pytest.raises(NotFoundError):
+        get_user(session, user_id=0)
+```

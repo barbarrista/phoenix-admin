@@ -1,0 +1,25 @@
+---
+description: Write simple code that follows DRY, KISS, YAGNI, and SOLID without extra abstraction
+alwaysApply: true
+---
+
+# Coding principles
+
+Prefer the smallest design that solves the current problem. Apply DRY, KISS, YAGNI, and SOLID only as far as they remove real complexity.
+
+- **DRY**: Share logic that is the same and will change for the same reason. A few duplicated lines are fine when the cases are likely to diverge.
+- **KISS**: Use straight control flow and plain names. Skip clever indirection.
+- **YAGNI**: Add a parameter, hook, config flag, or extension point only when a caller needs it now.
+- **SOLID**: Keep a unit focused on one reason to change, and depend on a narrow interface when more than one implementation exists.
+
+Do not add a base class, protocol, factory, or helper for a single call site. Extract it when a second real caller appears.
+
+```python
+# Too much for one caller
+class UserNameFormatter(Protocol):
+    def format(self, user: User) -> str: ...
+
+# Enough
+def format_user_name(user: User) -> str:
+    return f"{user.first} {user.last}"
+```
