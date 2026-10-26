@@ -20,3 +20,7 @@ class ViewConfig(ViewConfigBase):
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ModelViewConfig(ViewConfigBase):
     page_limit: Annotated[int, Doc("Limit for items in list page")] = 30
+    max_page_limit: Annotated[
+        int,
+        Doc("Upper bound for the requested list page limit"),
+    ] = 100

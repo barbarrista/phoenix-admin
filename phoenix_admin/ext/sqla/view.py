@@ -33,6 +33,10 @@ from phoenix_admin.views.base import BaseView
 _TModel = TypeVar("_TModel", bound=DeclarativeBase)
 
 
+class InvalidPaginationError(Exception):
+    """Raised when a requested list limit or offset is outside the accepted range."""
+
+
 class SqlalchemyModelView(BaseView, Generic[_TModel]):
     __orm_model__: type[_TModel]
     __config__: ClassVar[ModelViewConfig | None] = None
@@ -144,20 +148,47 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
 
         return base_stmt.order_by(*self.pk_field.columns(self.__orm_model__))
 
+    def _resolve_pagination(self, dto: PaginationParamsDTO) -> tuple[int, int]:
+        limit = dto.limit
+        if limit is None:
+            limit = self.config.page_limit
+        elif limit < 1:
+            msg = "limit must be at least 1"
+            raise InvalidPaginationError(msg)
+        elif limit > self.config.max_page_limit:
+            limit = self.config.max_page_limit
+
+        offset = dto.offset
+        if offset is None:
+            offset = 0
+        elif offset < 0:
+            msg = "offset must be at least 0"
+            raise InvalidPaginationError(msg)
+
+        return limit, offset
+
     async def _apply_pagination(
         self,
         base_stmt: Select[tuple[_TModel]],
         *,
         dto: PaginationParamsDTO,
     ) -> Select[tuple[_TModel]]:
-        limit = dto.limit or self.config.page_limit
-        offset = dto.offset or 0
+        limit, offset = self._resolve_pagination(dto)
         return base_stmt.limit(limit).offset(offset)
 
     async def handle_api_request(self, request: Request) -> JSONResponse:
-        limit = request.query_params.get("limit")
-        offset = request.query_params.get("offset")
-        dto = PaginationParamsDTO(limit=cast_int(limit), offset=cast_int(offset))
+        dto = PaginationParamsDTO(
+            limit=cast_int(request.query_params.get("limit")),
+            offset=cast_int(request.query_params.get("offset")),
+        )
+        try:
+            self._resolve_pagination(dto)
+        except InvalidPaginationError as exc:
+            return JSONResponse(
+                status_code=HTTPStatus.BAD_REQUEST,
+                content={"detail": str(exc)},
+            )
+
         session = get_db_session(request)
 
         stmt = await self.get_list_stmt()
