@@ -249,7 +249,11 @@ class BooleanFieldMapper(BaseFieldMapper):
         msg = f"Unexpected value: {value}"
         raise ValueError(msg)
 
-    def to_html(self, value: Any, **kwargs: FieldMapperKwargs) -> str:  # noqa: ANN401, ARG002
+    def to_html(
+        self,
+        value: Any,  # noqa: ANN401
+        **kwargs: Unpack[FieldMapperKwargs],  # noqa: ARG002
+    ) -> str:
         if value is None:
             return "-"
 

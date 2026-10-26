@@ -27,7 +27,7 @@ class Pk:
         pk = self.pk
         if isinstance(pk, str):
             return (pk,)
-            
+
         if isinstance(pk, InstrumentedAttribute):
             return (pk,)
 

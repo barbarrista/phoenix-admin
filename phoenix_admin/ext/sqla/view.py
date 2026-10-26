@@ -88,6 +88,7 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
         session: AsyncSession,
         dto: PaginationParamsDTO,
     ) -> Sequence[_TModel]:
+        base_stmt = self._apply_pk_order(base_stmt)
         base_stmt = await self._apply_pagination(base_stmt, dto=dto)
         return (await session.scalars(base_stmt)).all()
 
@@ -96,7 +97,15 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
         stmt: Select[tuple[_TModel]],
         session: AsyncSession,
     ) -> int:
-        count_stmt = select(count()).select_from(stmt.subquery())
+        pk_columns = self.pk_field.columns(self.__orm_model__)
+        distinct_pks = (
+            stmt.order_by(None)
+            .limit(None)
+            .offset(None)
+            .with_only_columns(*pk_columns, maintain_column_froms=True)
+            .distinct()
+        )
+        count_stmt = select(count()).select_from(distinct_pks.subquery())
         return await session.scalar(count_stmt) or 0
 
     async def get_list_stmt(self) -> Select[tuple[_TModel]]:
@@ -125,6 +134,15 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
             base_stmt = base_stmt.options(load_strategy)
 
         return base_stmt
+
+    def _apply_pk_order(
+        self,
+        base_stmt: Select[tuple[_TModel]],
+    ) -> Select[tuple[_TModel]]:
+        if base_stmt._order_by_clauses:  # noqa: SLF001
+            return base_stmt
+
+        return base_stmt.order_by(*self.pk_field.columns(self.__orm_model__))
 
     async def _apply_pagination(
         self,
