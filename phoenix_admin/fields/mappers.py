@@ -17,7 +17,11 @@ from typing import (
 from markupsafe import escape
 from starlette.requests import Request
 
-from phoenix_admin.fields.exceptions import ParseError, try_cast
+from phoenix_admin.fields.exceptions import (
+    UNEXPECTED_NONE_MESSAGE,
+    ParseError,
+    try_cast,
+)
 from phoenix_admin.utils import getval
 
 if TYPE_CHECKING:
@@ -59,7 +63,7 @@ class BaseFieldMapper:
 
     @staticmethod
     def _getval(value: _T | None) -> _T:
-        return getval(value, exc=ParseError("Got unexpected None value"))
+        return getval(value, exc=ParseError(UNEXPECTED_NONE_MESSAGE))
 
 
 class TextFieldMapper(BaseFieldMapper):

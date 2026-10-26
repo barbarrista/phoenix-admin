@@ -1,0 +1,32 @@
+---
+description: Keep type hints precise; avoid object, Any, and untyped *args or **kwargs
+alwaysApply: true
+---
+
+# Type hints
+
+Use the narrowest type that describes the value. A hint that accepts everything documents nothing.
+
+- Do not annotate with bare `object`. Name the real type, a `Protocol`, a union, or a `TypeVar`.
+- Do not annotate with `Any`. Use it only when no precise type can be written, such as a value passed through unchanged from an untyped third-party boundary. Leave a short comment saying why.
+- Do not leave `*args` or `**kwargs` untyped, and do not type them as `Any`. Give each a real element type. If the callable forwards unknown parameters, type the parameters with `ParamSpec`.
+
+```python
+# Bad
+def save(value: object) -> Any: ...
+
+def call(*args, **kwargs) -> None: ...
+
+def call(*args: Any, **kwargs: Any) -> None: ...
+
+# Good
+def save(value: User) -> User: ...
+
+def call(*ids: int, **flags: bool) -> None: ...
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def retry(fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+```

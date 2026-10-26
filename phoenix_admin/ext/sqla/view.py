@@ -15,7 +15,7 @@ from starlette.templating import Jinja2Templates
 from typing_extensions import Doc
 
 from phoenix_admin.config import ModelViewConfig
-from phoenix_admin.ext.sqla.dto import PaginationParamsDTO
+from phoenix_admin.ext.sqla.dto import PaginationParamsDTO, PaginationResponseSchema
 from phoenix_admin.ext.sqla.fields import RelationshipField
 from phoenix_admin.ext.sqla.mapper import SqlalchemyMapper
 from phoenix_admin.ext.sqla.pk import Pk
@@ -208,13 +208,11 @@ class SqlalchemyModelView(BaseView, Generic[_TModel]):
 
         result = await self.get_list(stmt, dto=dto, session=session)
         data = await self.map_to_json(result, request=request)
-
-        return JSONResponse(
-            content={
-                "results": data,
-                "count": total,
-            }
+        payload = PaginationResponseSchema.model_validate(
+            {"results": data, "count": total},
         )
+
+        return JSONResponse(content=payload.model_dump())
 
     async def map_to_json(
         self,

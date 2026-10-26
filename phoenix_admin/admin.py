@@ -285,6 +285,14 @@ class AdminApp:
                     msg = f'Define the "{field_name}" in {qualname(view)} view'
                     raise ValueError(msg)
 
+            if not getattr(view, "fields", None):
+                msg = f'Define the "fields" in {qualname(view)} view'
+                raise ValueError(msg)
+
+            if view.identity in self._model_view_registry:
+                msg = f'Identity "{view.identity}" is already registered'
+                raise ValueError(msg)
+
             return
 
         if isinstance(view, DropDown):

@@ -18,19 +18,24 @@ CRUD for a SQLAlchemy 2 model. The async session comes from `SqlalchemyAsyncSess
 
 #### Already in place
 
-- [x] `SqlalchemyModelView` registered by `identity`
+- [x] `SqlalchemyModelView` registered by `identity`. `add_view` rejects a missing or empty `fields` and a duplicate `identity`
 - [x] Routes `/{identity}/list`, `/detail/{ident}`, `/create`, `/update/{ident}`, `/api/{identity}`
-- [x] List page: gridjs calls `GET /api/{identity}?limit&offset` and renders `{results, count}`
-- [x] Columns from `fields` + `TableColumnProps`; values via `SqlalchemyMapper.to_json` and field `to_html`
-- [x] `RelationshipField`: default `joinedload`, label from the related view `repr_model`
-- [x] `Pk.extract_value` for a single key and a composite key
+- [x] List page: gridjs calls `GET /api/{identity}?limit&offset` and renders `{results, count}` (`PaginationResponseSchema`)
+- [x] Columns from `fields` + `TableColumnProps`. `SqlalchemyMapper.to_json` returns values; `map_to_json` calls `to_html`, which escapes with `markupsafe.escape` (an email address is escaped before it is placed in `href`). A field with `mapper is None` still occupies one cell. List values are escaped item by item
+- [x] `RelationshipField`: many-to-one uses `joinedload`, a collection (`uselist`) uses `selectinload`. An explicit `load_strategy` replaces the default. A `RelationshipField` pointed at a plain column raises `TypeError`. The label comes from the related view `repr_model`
+- [x] `Pk.extract_value` for a column name, an `InstrumentedAttribute`, or a composite `list` / `tuple`. Each component is stringified before the values are joined. `Pk.columns` exposes those columns for `ORDER BY` and `COUNT`
+- [x] When `get_list_stmt` has no `ORDER BY`, the list is ordered by the primary key, then paginated. An `ORDER BY` set on the statement is kept
+- [x] `get_count` counts distinct primary-key rows. `ORDER BY`, `limit` and `offset` are dropped; `FROM` and `JOIN` from `get_list_stmt` stay, so a join does not inflate the count
+- [x] A missing `limit` uses `page_limit`. `limit < 1` and `offset < 0` return 400. A `limit` above `ModelViewConfig.max_page_limit` (default 100) is clamped to that ceiling
+- [x] A column is optional when it is nullable. A many-to-one relationship is optional when its foreign key is nullable. `required=True` forces the field to be required. `to_json` and `from_json` share this check. `NULL` in an optional column renders as `"-"`
+- [x] `SqlalchemyMapper.from_json` awaits each field mapper, reads `field.name` when it is set and `source_field_name` otherwise, and stores the value under `source_field_name`. `RelationshipMapper.from_json` still raises `NotImplementedError`
 - [x] Overridable `get_list_stmt`, `get_list`, `get_count`
 
-Detail, create and update templates only print the title. `POST` on those actions raises `NotImplementedError`. There is no delete route.
+Detail, create and update templates only print the title. `POST` on those actions raises `NotImplementedError`. There is no delete route. `Pk.parse` does not exist yet, so a URL segment cannot be turned back into a row.
 
 #### 1. Primary key in the URL
 
-`extract_value` already serializes a key to a string (`id` or `id1,id2`). The reverse path does not exist, so detail/update cannot load a row.
+`extract_value` serializes a key to a string (`id` or `id1,id2`). The reverse path does not exist, so detail/update cannot load a row.
 
 - [ ] `Pk.parse(ident)` round-trips `extract_value`. A composite key segment must not contain a comma
 - [ ] `get_one(session, ident)` selects by that PK and applies the same relationship load strategies as the list
@@ -44,14 +49,10 @@ Detail, create and update templates only print the title. `POST` on those action
 
 #### 3. Create and update
 
-Reuse the `form_fields/*` templates. `ModelViewConfig` has no `submit_button_text` today; the form can use a fixed "Save" until that field exists.
+Reuse the `form_fields/*` templates. `from_json` and column optionality are already in place; this step wires them to the create and update actions. `ModelViewConfig` has no `submit_button_text` today; the form can use a fixed "Save" until that field exists.
 
 - [ ] `GET /create` renders an empty form. `GET /update/{ident}` fills it from `get_one`
 - [ ] `POST` runs `SqlalchemyMapper.from_json`, then inserts or updates the row
-- [ ] Fix `from_json` before using it:
-  - await `field.mapper.from_json` (it is async and currently called without `await`)
-  - key the result by `source_field_name`. The current code stores `InstrumentedAttribute` as the dict key and reads `field.name`, which stays empty on model-view fields
-  - treat a column as optional from its nullability. The mapper now uses `field.required is False`
 - [ ] PK is omitted on create and readonly on update
 - [ ] After a successful save, redirect to detail
 - [ ] Validation errors render like `FormView` (`FormValidationError` next to the field). `IntegrityError` becomes a form error, not a traceback
@@ -82,7 +83,7 @@ One `fields` tuple is the default for list, detail, create and update. The proto
 
 #### 7. Sort and search
 
-`list.html` turns on gridjs `sort` and `search` while pagination is server-side. Sort and search never reach `/api/{identity}`, so they only apply to the current page.
+Pages are already stable: the list is ordered by the primary key unless `get_list_stmt` sets its own `ORDER BY`. `list.html` also turns on gridjs `sort` and `search` while pagination is server-side. Those controls never reach `/api/{identity}`, so they only reorder or filter the current page.
 
 - [ ] `sort` and `order` query params, applied in `get_list_stmt`, only for columns with `column_props.sort`
 - [ ] `q` query param against an explicit `search_fields` list

@@ -4,10 +4,11 @@ from http import HTTPStatus
 from types import SimpleNamespace
 from typing import cast
 
+import phoenix_admin.ext.sqla.dto as sqla_dto
 import pytest
 import pytest_asyncio
 from phoenix_admin.config import ModelViewConfig
-from phoenix_admin.ext.sqla.dto import PaginationParamsDTO
+from phoenix_admin.ext.sqla.dto import PaginationParamsDTO, PaginationResponseSchema
 from phoenix_admin.ext.sqla.pk import Pk
 from phoenix_admin.ext.sqla.view import SqlalchemyModelView
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,15 @@ class ItemView(SqlalchemyModelView[Item]):
 
 def test_max_page_limit_defaults_to_100() -> None:
     assert ModelViewConfig().max_page_limit == 100  # noqa: PLR2004
+
+
+def test_pagination_schema_is_the_list_body() -> None:
+    dumped = PaginationResponseSchema(results=[["cell"]], count=1).model_dump()
+
+    assert dumped == {"results": [["cell"]], "count": 1}
+    assert not hasattr(sqla_dto, "ApiResponseSchema")
+    assert not hasattr(sqla_dto, "RelationshipMember")
+    assert not hasattr(sqla_dto, "MappedEntity")
 
 
 async def seed_items(session: AsyncSession) -> list[Item]:
@@ -96,10 +106,13 @@ async def test_missing_limit_uses_page_limit(
     response = await view.handle_api_request(api_request("", session))
     body = json.loads(bytes(response.body))
 
+    parsed = PaginationResponseSchema.model_validate(body)
+
     assert ids_of(page) == ordered[: view.config.page_limit]
     assert response.status_code == HTTPStatus.OK
-    assert len(body["results"]) == view.config.page_limit
-    assert body["count"] == len(items)
+    assert set(body) == {"results", "count"}
+    assert parsed.count == len(items)
+    assert len(parsed.results) == view.config.page_limit
 
 
 @pytest.mark.asyncio

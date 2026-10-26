@@ -2,6 +2,8 @@ from typing import Any, TypeVar, cast
 
 _T = TypeVar("_T", bound=Any)
 
+UNEXPECTED_NONE_MESSAGE = "Got unexpected None value"
+
 
 class ParseError(Exception):
     def __init__(self, message: str | None = None) -> None:
