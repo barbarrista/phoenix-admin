@@ -196,7 +196,7 @@ class HiddenField(BaseField):
 @dataclass(kw_only=True)
 class FileField(BaseField):
     field_type: Literal["file"] = field(default="file", init=False)
-    mapper = None
+    mapper: BaseFieldMapper | None = None
     accept: str | None = None
     multiple: bool = False
     form_template = "form_fields/file.html"

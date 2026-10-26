@@ -79,14 +79,15 @@ class SqlalchemyMapper:
             if field.mapper is None:
                 continue
 
-            if field.source_field is None:
+            source_name = field.source_field_name
+            if source_name is None:
                 raise ValueError(self._source_field_error_msg)
 
-            value = raw_data.get(field.name)
-            parsed_value = field.mapper.from_json(
-                value,
+            raw_key = field.name or source_name
+            parsed_value = await field.mapper.from_json(
+                raw_data.get(raw_key),
                 is_optional=field.required is False,
             )
-            mapping[field.source_field] = parsed_value
+            mapping[source_name] = parsed_value
 
         return mapping
