@@ -63,6 +63,9 @@ lint = [
   "mypy>=1.19.0",
   "ruff>=0.14.6",
 ]
+tests = [
+    "pytest>=9.1.1",
+]
 
 [tool.ruff]
 exclude = []

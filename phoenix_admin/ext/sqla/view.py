@@ -1,11 +1,11 @@
 from collections.abc import Sequence
 from http import HTTPMethod, HTTPStatus
-from typing import Annotated, Any, ClassVar, Generic, Literal, TypeAlias, TypeVar
+from typing import Annotated, Any, ClassVar, Generic, Literal, TypeVar
 
 import jinja2
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import DeclarativeBase, InstrumentedAttribute
+from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql.functions import count
 from starlette.datastructures import Headers
 from starlette.requests import Request
@@ -30,13 +30,6 @@ from phoenix_admin.table import TableColumnProps, TableColumnPropsList
 from phoenix_admin.utils import cast_int, get_request_action, getval, qualname
 from phoenix_admin.views.base import BaseView
 
-PkFields: TypeAlias = (
-    list[str]
-    | tuple[str, ...]
-    | Sequence[InstrumentedAttribute[Any]]
-    | str
-    | InstrumentedAttribute[Any]
-)
 _TModel = TypeVar("_TModel", bound=DeclarativeBase)
 
 
